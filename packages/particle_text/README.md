@@ -34,7 +34,7 @@ Move your cursor or touch to scatter the particles!
 
 ```yaml
 dependencies:
-  particle_text: ^0.1.0
+  particle_text: ^0.1.1
 ```
 
 ## Usage

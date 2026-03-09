@@ -35,7 +35,7 @@ Move your cursor or touch to scatter the particles!
 
 ```yaml
 dependencies:
-  particle_image: ^0.0.1
+  particle_image: ^0.0.2
 ```
 
 ## Usage
