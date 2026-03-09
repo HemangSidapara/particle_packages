@@ -1,3 +1,7 @@
+## 0.1.1
+
+* Repository URL fix
+
 ## 0.1.0
 
 * **BREAKING**: Core engine extracted to `particle_core` package
