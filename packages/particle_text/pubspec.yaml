@@ -2,9 +2,9 @@ name: particle_text
 description: >
   Interactive particle text effect for Flutter. Thousands of particles form
   text shapes and scatter on touch/hover, with spring-based physics.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/HemangSidapara/particle_packages
-repository: https://github.com/HemangSidapara/particle_packages/tree/main/packages/particle_text
+repository: https://github.com/HemangSidapara/particle_packages/tree/master/packages/particle_text
 issue_tracker: https://github.com/HemangSidapara/particle_packages/issues
 
 resolution: workspace
@@ -16,7 +16,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  particle_core: ^0.0.1
+  particle_core: ^0.0.2
 
 dev_dependencies:
   flutter_test:

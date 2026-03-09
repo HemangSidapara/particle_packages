@@ -2,17 +2,16 @@ name: particle_core
 description: >
   Core engine for particle effects in Flutter. High-performance physics,
   single GPU draw call rendering via drawRawAtlas, and full customization.
-  Used by particle_text and particle_image.
-version: 0.0.1
+version: 0.0.2
 homepage: https://github.com/HemangSidapara/particle_packages
-repository: https://github.com/HemangSidapara/particle_packages/tree/main/packages/particle_core
+repository: https://github.com/HemangSidapara/particle_packages/tree/master/packages/particle_core
 issue_tracker: https://github.com/HemangSidapara/particle_packages/issues
 
 resolution: workspace
 
 environment:
   sdk: ^3.9.0
-  flutter: '>=3.10.0'
+  flutter: ">=3.10.0"
 
 dependencies:
   flutter:
