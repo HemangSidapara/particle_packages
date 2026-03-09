@@ -18,7 +18,7 @@ Move your cursor or touch to scatter the particles!
 
 <!--suppress HtmlDeprecatedAttribute -->
 <p align="center">
-  <img src="https://raw.githubusercontent.com/HemangSidapara/particle_packages/master/preview/text_preview.gif" alt="particle_text demo" width="300"/>
+  <img src="https://raw.githubusercontent.com/HemangSidapara/particle_packages/master/preview/text_preview.gif" alt="particle_text demo" width="600"/>
 </p>
 
 ## Features
