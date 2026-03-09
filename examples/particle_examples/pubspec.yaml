@@ -1,0 +1,25 @@
+name: particle_examples
+description: Demo app showcasing particle_text and particle_image packages.
+publish_to: 'none'
+
+resolution: workspace
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  particle_text: ^0.1.0
+  particle_image: ^0.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/flutter_logo.png
+    - assets/mw_logo.png

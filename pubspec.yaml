@@ -1,0 +1,35 @@
+name: particle_packages
+publish_to: 'none'
+
+environment:
+  sdk: ^3.9.0
+
+workspace:
+  - packages/particle_core
+  - packages/particle_text
+  - packages/particle_image
+  - examples/particle_examples
+
+dev_dependencies:
+  melos: ^7.4.0
+
+melos:
+  repository: https://github.com/HemangSidapara/particle_packages
+
+  command:
+    version:
+      linkToCommits: true
+
+  scripts:
+    test:
+      exec: flutter test
+      packageFilters:
+        dirExists: test
+    publish:dry:
+      exec: dart pub publish --dry-run
+      packageFilters:
+        noPrivate: true
+    publish:
+      exec: dart pub publish
+      packageFilters:
+        noPrivate: true

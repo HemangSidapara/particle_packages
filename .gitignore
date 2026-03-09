@@ -1,0 +1,49 @@
+# Private docs
+PUBLISHING.md
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Dart/Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+pubspec_overrides.yaml
+.metadata
+
+# Melos (legacy)
+.melos_tool/
+.melos/
+melos.yaml
+
+# Coverage
+coverage/
+
+# Android
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+
+# iOS
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/Generated.xcconfig
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# macOS
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Linux/Windows generated
+**/linux/flutter/generated_plugin_registrant.*
+**/linux/flutter/generated_plugins.cmake
+**/windows/flutter/generated_plugin_registrant.*
+**/windows/flutter/generated_plugins.cmake
+
+# Generated
+*.g.dart

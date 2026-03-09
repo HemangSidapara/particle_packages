@@ -1,0 +1,201 @@
+import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
+import 'package:particle_core/particle_core.dart';
+
+/// Renders an image as interactive particles.
+///
+/// Each particle takes the color of its source pixel, creating
+/// a colorful particle representation of the image that scatters
+/// on touch/hover.
+///
+/// ```dart
+/// ParticleImage(
+///   image: myUiImage,
+///   config: ParticleConfig(particleDensity: 2000),
+/// )
+/// ```
+///
+/// To load from an asset:
+/// ```dart
+/// ParticleImage.asset(
+///   'assets/logo.png',
+///   config: ParticleConfig.cosmic(),
+/// )
+/// ```
+class ParticleImage extends StatefulWidget {
+  /// A pre-loaded [ui.Image] to render as particles.
+  /// Either [image] or [assetPath] must be provided.
+  final ui.Image? image;
+
+  /// Asset path to load an image from (e.g. 'assets/logo.png').
+  /// Either [image] or [assetPath] must be provided.
+  final String? assetPath;
+
+  /// Configuration for particle behavior and appearance.
+  /// Note: [particleColor] and [displacedColor] are ignored in image mode;
+  /// per-pixel colors from the image are used instead.
+  final ParticleConfig config;
+
+  /// If true, the widget expands to fill its parent.
+  final bool expand;
+
+  /// Called when the image is loaded and particles start forming.
+  final VoidCallback? onImageLoaded;
+
+  /// Creates a ParticleImage from a pre-loaded [ui.Image].
+  const ParticleImage({
+    super.key,
+    required this.image,
+    this.config = const ParticleConfig(),
+    this.expand = true,
+    this.onImageLoaded,
+  }) : assetPath = null;
+
+  /// Creates a ParticleImage from an asset path.
+  const ParticleImage.asset(
+    this.assetPath, {
+    super.key,
+    this.config = const ParticleConfig(),
+    this.expand = true,
+    this.onImageLoaded,
+  }) : image = null;
+
+  @override
+  State<ParticleImage> createState() => _ParticleImageState();
+}
+
+class _ParticleImageState extends State<ParticleImage> with SingleTickerProviderStateMixin {
+  late Ticker _ticker;
+  late ParticleSystem _system;
+  late ParticlePainter _painter;
+  bool _initialized = false;
+  Size _lastSize = Size.zero;
+  ui.Image? _loadedImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _system = ParticleSystem(config: widget.config);
+    _painter = ParticlePainter(system: _system, config: widget.config);
+    _ticker = createTicker(_onTick)..start();
+
+    if (widget.assetPath != null) {
+      _loadAsset(widget.assetPath!);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ParticleImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.config != widget.config) {
+      _system.dispose();
+      _system = ParticleSystem(config: widget.config);
+      _painter = ParticlePainter(system: _system, config: widget.config);
+      _initialized = false;
+      if (_lastSize != Size.zero) {
+        _initSystem(_lastSize, MediaQuery.of(context).devicePixelRatio);
+      }
+    }
+
+    if (oldWidget.image != widget.image && widget.image != null) {
+      _loadedImage = null;
+      _initialized = false;
+      if (_lastSize != Size.zero) {
+        _initSystem(_lastSize, MediaQuery.of(context).devicePixelRatio);
+      }
+    }
+
+    if (oldWidget.assetPath != widget.assetPath && widget.assetPath != null) {
+      _loadedImage = null;
+      _initialized = false;
+      _loadAsset(widget.assetPath!);
+    }
+  }
+
+  Future<void> _loadAsset(String path) async {
+    final data = await rootBundle.load(path);
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    _loadedImage = frame.image;
+
+    // Force re-init now that image is available
+    _initialized = false;
+    if (_lastSize != Size.zero) {
+      _initSystem(_lastSize, MediaQuery.of(context).devicePixelRatio);
+    } else {
+      // Size not known yet — setState to trigger build → LayoutBuilder → _initSystem
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    _system.dispose();
+    super.dispose();
+  }
+
+  void _onTick(Duration elapsed) {
+    _system.tick();
+  }
+
+  Future<void> _initSystem(Size size, double dpr) async {
+    // Always save size so _loadAsset can use it later
+    _lastSize = size;
+    _system.screenSize = size;
+    _system.devicePixelRatio = dpr;
+
+    final image = widget.image ?? _loadedImage;
+    if (image == null) return; // asset still loading
+    if (_initialized) return;
+
+    _initialized = true;
+
+    if (_system.sprite == null) {
+      await _system.init();
+    }
+
+    await _system.setImage(image, size);
+    widget.onImageLoaded?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+
+    Widget child = LayoutBuilder(
+      builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        _initSystem(size, dpr);
+
+        return RepaintBoundary(
+          child: GestureDetector(
+            onPanStart: (d) => _system.pointer = d.localPosition,
+            onPanUpdate: (d) => _system.pointer = d.localPosition,
+            onPanEnd: (_) => _system.pointer = const Offset(-9999, -9999),
+            onPanCancel: () => _system.pointer = const Offset(-9999, -9999),
+            child: MouseRegion(
+              onHover: (e) => _system.pointer = e.localPosition,
+              onExit: (_) => _system.pointer = const Offset(-9999, -9999),
+              cursor: SystemMouseCursors.none,
+              child: CustomPaint(
+                size: size,
+                painter: _painter,
+                willChange: true,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (widget.expand) {
+      child = SizedBox.expand(child: child);
+    }
+
+    return child;
+  }
+}
