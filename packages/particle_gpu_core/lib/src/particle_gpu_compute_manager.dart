@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' as Math;
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
@@ -56,17 +56,16 @@ class ParticleGPUComputeManager extends IParticleCore {
 
     print('GPU: Starting GPGPU initialization for $particleCount particles...');
     try {
-
       const texSize = 512;
       final initialBytes = Uint8List(texSize * texSize * 4);
-      
+
       // Initialize particles in a grid
       for (int i = 0; i < texSize * texSize; i++) {
         final x = (i % texSize) / texSize * 255;
         final y = (i ~/ texSize) / texSize * 255;
         initialBytes[i * 4] = x.toInt();
         initialBytes[i * 4 + 1] = y.toInt();
-        initialBytes[i * 4 + 2] = 127; 
+        initialBytes[i * 4 + 2] = 127;
         initialBytes[i * 4 + 3] = 255; // Alpha/Full opacity
       }
 
@@ -75,7 +74,7 @@ class ParticleGPUComputeManager extends IParticleCore {
       _targetData = await _createImageFromBytes(initialBytes, texSize, texSize);
 
       await _initCpuCaches();
-      
+
       _initialized = true;
       _isInitializing = false;
       notifyListeners();
@@ -104,7 +103,7 @@ class ParticleGPUComputeManager extends IParticleCore {
     // 1. Create a simple white dot sprite
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
-    canvas.drawCircle(const ui.Offset(4, 4), 3, ui.Paint()..color = ui.Color(0xFFFFFFFF));
+    canvas.drawCircle(const ui.Offset(4, 4), 3, ui.Paint()..color = const ui.Color(0xFFFFFFFF));
     final picture = recorder.endRecording();
     _sprite = await picture.toImage(8, 8);
 
@@ -116,24 +115,24 @@ class ParticleGPUComputeManager extends IParticleCore {
     _targets = Float32List(particleCount * 2);
 
     for (int i = 0; i < particleCount; i++) {
-        _srcRects![i * 4 + 0] = 0;
-        _srcRects![i * 4 + 1] = 0;
-        _srcRects![i * 4 + 2] = 8;
-        _srcRects![i * 4 + 3] = 8;
-        _colors![i] = config.particleColor.value;
-        
-        // Random layout initially
-        _transforms![i * 4 + 0] = 1.0; // scale
-        _transforms![i * 4 + 1] = 0.0; // skew
-        _transforms![i * 4 + 2] = (i % 300) * (screenSize.width / 300); // x
-        _transforms![i * 4 + 3] = (i ~/ 300) * (screenSize.height / (particleCount / 300)); // y
+      _srcRects![i * 4 + 0] = 0;
+      _srcRects![i * 4 + 1] = 0;
+      _srcRects![i * 4 + 2] = 8;
+      _srcRects![i * 4 + 3] = 8;
+      _colors![i] = config.particleColor.toARGB32();
+
+      // Random layout initially
+      _transforms![i * 4 + 0] = 1.0; // scale
+      _transforms![i * 4 + 1] = 0.0; // skew
+      _transforms![i * 4 + 2] = (i % 300) * (screenSize.width / 300); // x
+      _transforms![i * 4 + 3] = (i ~/ 300) * (screenSize.height / (particleCount / 300)); // y
     }
   }
 
   @override
   void tick({required ui.Offset pointer, required ParticleConfig config}) {
     if (!_initialized || _transforms == null || _velocities == null || _targets == null) return;
-    
+
     final px = pointer.dx;
     final py = pointer.dy;
     final mr = config.mouseRadius;
@@ -143,48 +142,48 @@ class ParticleGPUComputeManager extends IParticleCore {
     final fr = config.friction;
 
     for (int i = 0; i < particleCount; i++) {
-        final i2 = i * 2;
-        final i4 = i * 4;
+      final i2 = i * 2;
+      final i4 = i * 4;
 
-        // Current Position
-        double x = _transforms![i4 + 2];
-        double y = _transforms![i4 + 3];
-        
-        // Velocity
-        double vx = _velocities![i2 + 0];
-        double vy = _velocities![i2 + 1];
+      // Current Position
+      double x = _transforms![i4 + 2];
+      double y = _transforms![i4 + 3];
 
-        // Target Attraction
-        final dxT = _targets![i2 + 0] - x;
-        final dyT = _targets![i2 + 1] - y;
-        vx += dxT * rs;
-        vy += dyT * rs;
+      // Velocity
+      double vx = _velocities![i2 + 0];
+      double vy = _velocities![i2 + 1];
 
-        // Mouse Repulsion
-        final dxM = x - px;
-        final dyM = y - py;
-        final dist2 = dxM * dxM + dyM * dyM;
-        if (dist2 < mr2 && dist2 > 0.01) {
-            final distM = Math.sqrt(dist2);
-            final force = (mr - distM) / mr * rf;
-            final invDist = 1.0 / distM;
-            vx += dxM * invDist * force;
-            vy += dyM * invDist * force;
-        }
+      // Target Attraction
+      final dxT = _targets![i2 + 0] - x;
+      final dyT = _targets![i2 + 1] - y;
+      vx += dxT * rs;
+      vy += dyT * rs;
 
-        // Friction & Update
-        vx *= fr;
-        vy *= fr;
-        x += vx;
-        y += vy;
+      // Mouse Repulsion
+      final dxM = x - px;
+      final dyM = y - py;
+      final dist2 = dxM * dxM + dyM * dyM;
+      if (dist2 < mr2 && dist2 > 0.01) {
+        final distM = math.sqrt(dist2);
+        final force = (mr - distM) / mr * rf;
+        final invDist = 1.0 / distM;
+        vx += dxM * invDist * force;
+        vy += dyM * invDist * force;
+      }
 
-        // Store back
-        _velocities![i2 + 0] = vx;
-        _velocities![i2 + 1] = vy;
-        _transforms![i4 + 2] = x;
-        _transforms![i4 + 3] = y;
+      // Friction & Update
+      vx *= fr;
+      vy *= fr;
+      x += vx;
+      y += vy;
+
+      // Store back
+      _velocities![i2 + 0] = vx;
+      _velocities![i2 + 1] = vy;
+      _transforms![i4 + 2] = x;
+      _transforms![i4 + 3] = y;
     }
-    
+
     _pocDrift += 0.005;
     notifyListeners();
   }
@@ -194,25 +193,28 @@ class ParticleGPUComputeManager extends IParticleCore {
   @override
   Future<void> setText(String text, ui.Size size) async {
     if (!_initialized) await initialize();
-    
+
     // 1. Rasterize text to sample points
-    final tp = ui.ParagraphBuilder(ui.ParagraphStyle(
-        textAlign: ui.TextAlign.center,
-        fontSize: config.fontSize,
-        fontWeight: ui.FontWeight.bold,
-    ))
-    ..pushStyle(ui.TextStyle(color: const ui.Color(0xFFFFFFFF)))
-    ..addText(text);
-    
+    final tp =
+        ui.ParagraphBuilder(
+            ui.ParagraphStyle(
+              textAlign: ui.TextAlign.center,
+              fontSize: config.fontSize,
+              fontWeight: ui.FontWeight.bold,
+            ),
+          )
+          ..pushStyle(ui.TextStyle(color: const ui.Color(0xFFFFFFFF)))
+          ..addText(text);
+
     final paragraph = tp.build()..layout(ui.ParagraphConstraints(width: size.width));
-    
+
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
     canvas.drawParagraph(paragraph, ui.Offset(0, (size.height - paragraph.height) / 2));
     final picture = recorder.endRecording();
     final img = await picture.toImage(size.width.toInt(), size.height.toInt());
     final data = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
-    
+
     if (data == null || _transforms == null) return;
 
     // 2. Sample valid points (where alpha > 128)
@@ -221,7 +223,7 @@ class ParticleGPUComputeManager extends IParticleCore {
     final width = img.width;
     final height = img.height;
     const step = 2; // sample every 2nd pixel for speed
-    
+
     for (int y = 0; y < height; y += step) {
       for (int x = 0; x < width; x += step) {
         final idx = (y * width + x) * 4;
@@ -234,23 +236,23 @@ class ParticleGPUComputeManager extends IParticleCore {
     if (points.isEmpty) return;
 
     // 3. Map 100,000 particles to these points with scatter targets
-    final random = Math.Random();
+    final random = math.Random();
     for (int i = 0; i < particleCount; i++) {
-        final p = points[i % points.length];
-        // Jitter the TARGETS to create a beautiful cloud effect
-        final jitterX = (random.nextDouble() - 0.5) * 8.0;
-        final jitterY = (random.nextDouble() - 0.5) * 8.0;
-        
-        _targets![i * 2 + 0] = p.dx + jitterX;
-        _targets![i * 2 + 1] = p.dy + jitterY;
-        
-        // If they were just initialized, snap them to targets or scatter them
-        if (_transforms![i * 4 + 2] == 0) {
-           _transforms![i * 4 + 2] = p.dx + jitterX;
-           _transforms![i * 4 + 3] = p.dy + jitterY;
-        }
+      final p = points[i % points.length];
+      // Jitter the TARGETS to create a beautiful cloud effect
+      final jitterX = (random.nextDouble() - 0.5) * 8.0;
+      final jitterY = (random.nextDouble() - 0.5) * 8.0;
+
+      _targets![i * 2 + 0] = p.dx + jitterX;
+      _targets![i * 2 + 1] = p.dy + jitterY;
+
+      // If they were just initialized, snap them to targets or scatter them
+      if (_transforms![i * 4 + 2] == 0) {
+        _transforms![i * 4 + 2] = p.dx + jitterX;
+        _transforms![i * 4 + 3] = p.dy + jitterY;
+      }
     }
-    
+
     notifyListeners();
   }
 
