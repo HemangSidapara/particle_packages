@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="../../resources/banner_2800x800.png"
+       alt="particle_text demo: Blue and cyan glowing particles form the word Flutter against a dark starry background. The particles scatter and reform responsively as the cursor moves across them, demonstrating spring physics interactions."
+       width="900"
+       style="border-radius:20px;">
+</p>
+
 # particle_image
 
 [![pub package](https://img.shields.io/pub/v/particle_image.svg)](https://pub.dev/packages/particle_image)
