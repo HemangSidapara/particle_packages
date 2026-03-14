@@ -14,6 +14,9 @@ import 'image_demos/full_screen_image.dart';
 import 'image_demos/sized_box_image.dart';
 import 'image_demos/expanded_image.dart';
 import 'image_demos/image_performance.dart';
+import 'image_demos/icon_demo.dart';
+import 'image_demos/ui_image_demo.dart';
+import 'image_demos/network_image_demo.dart';
 
 // Real-world
 import 'real_world/portfolio_landing.dart';
@@ -143,6 +146,9 @@ final _imageDemos = [
   _Demo('SizedBox', 'Fixed-size image widgets', Icons.crop_square, () => const SizedBoxImageDemo()),
   _Demo('Expanded', 'ParticleImage in flex layout', Icons.expand, () => const ExpandedImageDemo()),
   _Demo('Performance', 'Density + FPS counter', Icons.speed, () => const ImagePerformanceDemo()),
+  _Demo('Icon Particles', 'Material & Font Awesome icons', Icons.emoji_emotions, () => const IconParticleDemo()),
+  _Demo('Custom ui.Image', 'Canvas-drawn image as particles', Icons.brush, () => const UiImageDemo()),
+  _Demo('Network Image', 'Load from URL with particle placeholder', Icons.cloud_download, () => const NetworkImageDemo()),
 ];
 
 final _realWorldDemos = [
