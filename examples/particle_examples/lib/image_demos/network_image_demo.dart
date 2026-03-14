@@ -11,13 +11,33 @@ class NetworkImageDemo extends StatefulWidget {
 class _NetworkImageDemoState extends State<NetworkImageDemo> {
   int _selectedUrl = 0;
   bool _useParticlePlaceholder = true;
+  String? _statusMessage;
+  Color _statusColor = Colors.white54;
 
   final _urls = [
     'https://avatars.githubusercontent.com/u/14101776?s=400', // Flutter
     'https://avatars.githubusercontent.com/u/1609975?s=400', // Dart
     'https://avatars.githubusercontent.com/u/1342004?s=400', // Google
+    'https://this-url-does-not-exist.invalid/404.png', // Bad URL — triggers onError
   ];
-  final _labels = ['Flutter', 'Dart', 'Google'];
+  final _labels = ['Flutter', 'Dart', 'Google', '❌ Bad URL'];
+
+  void _onImageLoaded() => setState(() => _statusMessage = null);
+
+  void _onReady() {
+    setState(() {
+      _statusMessage = '✓ onReady — particles formed';
+      _statusColor = const Color(0xFF69F0AE);
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _statusMessage = null);
+    });
+  }
+
+  void _onError() => setState(() {
+        _statusMessage = '⚠ onError — failed to load image';
+        _statusColor = const Color(0xFFEF9A9A);
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +50,29 @@ class _NetworkImageDemoState extends State<NetworkImageDemo> {
             key: ValueKey('net-$_selectedUrl'),
             placeholder: _useParticlePlaceholder ? null : const Center(child: CircularProgressIndicator()),
             config: const ParticleConfig(particleDensity: 2500, showPointerGlow: true),
+            onImageLoaded: _onImageLoaded,
+            onReady: _onReady,
+            onError: _onError,
           ),
+          if (_statusMessage != null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 56,
+              left: 24,
+              right: 24,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _statusColor.withValues(alpha: 0.5)),
+                ),
+                child: Text(
+                  _statusMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: _statusColor, fontSize: 12.5),
+                ),
+              ),
+            ),
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             left: 8,

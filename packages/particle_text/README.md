@@ -33,6 +33,8 @@ Move your cursor or touch to scatter the particles!
 - **Spring physics** — smooth, natural particle reformation
 - **Fully customizable** — colors, particle count, physics, font, and more
 - **Built-in presets** — cosmic, fire, matrix, pastel, minimal
+- **Pause / resume control** — manual `paused` param + auto-pause on app background and inactive tabs
+- **Lifecycle callbacks** — `onReady`, `onPause`, `onResume`, `onTextChanged`
 - **Powered by particle_core** — high-performance single GPU draw call engine
 - **Cross-platform** — works on iOS, Android, Web, macOS, Windows, Linux
 
@@ -97,6 +99,59 @@ Simply update the `text` parameter and the particles will morph:
 ParticleText(
   text: _currentText, // change this and particles re-target
   onTextChanged: () => print('Morphing!'),
+)
+```
+
+### Pause and resume
+
+Stop the physics ticker entirely — zero CPU/GPU cost while paused:
+
+```dart
+ParticleText(
+  text: 'Hello',
+  paused: _isPaused, // toggle reactively
+)
+```
+
+Three pause sources are handled automatically:
+
+| Source | Behavior |
+|--------|----------|
+| `paused: true` | Manual — caller controls it |
+| App backgrounded | Auto-paused via `WidgetsBindingObserver` |
+| Inactive tab | Auto-paused via Flutter's `TickerMode` |
+
+### Callbacks
+
+```dart
+ParticleText(
+  text: 'Hello',
+  paused: _isPaused,
+  onReady: () {
+    // Fires once when particles have fully settled into shape.
+    // Use this for splash screen sequencing instead of a fixed timer.
+  },
+  onTextChanged: () {
+    // Fires when text changes and morph begins.
+  },
+  onPause: () {
+    // Fires when animation pauses — any source.
+  },
+  onResume: () {
+    // Fires when animation resumes — any source.
+  },
+)
+```
+
+#### Splash screen example with `onReady`
+
+```dart
+ParticleText(
+  text: 'MyApp',
+  onReady: () {
+    // Particles are fully visible — now start the fade-out
+    Future.delayed(const Duration(seconds: 1), fadeOut);
+  },
 )
 ```
 
@@ -231,6 +286,19 @@ ParticleConfig(particleCount: 6000)  // always exactly 6000, ignores content siz
 
 > **Max count behavior:** When `maxParticleCount` is left at its default (50,000), density-based
 > counts can exceed it. Set a custom value to enforce a hard cap.
+
+### Widget parameters
+
+| Parameter       | Type               | Default | Description |
+|-----------------|--------------------|---------|-------------|
+| `text`          | `String`           | required | Text to render as particles |
+| `config`        | `ParticleConfig`   | `ParticleConfig()` | Physics, appearance, and colors |
+| `expand`        | `bool`             | `true` | Fill parent container |
+| `paused`        | `bool`             | `false` | Pause the physics ticker entirely |
+| `onReady`       | `VoidCallback?`    | `null` | Fires once when particles fully settle (avg displacement < 2 px) |
+| `onTextChanged` | `VoidCallback?`    | `null` | Fires when text changes and morph begins |
+| `onPause`       | `VoidCallback?`    | `null` | Fires when animation pauses (any source) |
+| `onResume`      | `VoidCallback?`    | `null` | Fires when animation resumes (any source) |
 
 ### Responsive resize
 

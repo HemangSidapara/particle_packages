@@ -258,6 +258,27 @@ class ParticleSystem extends ChangeNotifier {
   /// GPU buffer for colors.
   Int32List? get atlasColors => _colors;
 
+  /// Whether particles have settled near their target positions.
+  ///
+  /// Samples up to 200 particles and checks that the average squared
+  /// distance to target is below 4px² (≈ 2px average displacement).
+  /// Used by widgets to fire [onReady] once particles are visually formed.
+  bool get isSettled {
+    if (particles.isEmpty) return false;
+    final n = particles.length;
+    final step = n > 200 ? n ~/ 200 : 1;
+    var sumDist2 = 0.0;
+    var count = 0;
+    for (var i = 0; i < n; i += step) {
+      final p = particles[i];
+      final dx = p.tx - p.x;
+      final dy = p.ty - p.y;
+      sumDist2 += dx * dx + dy * dy;
+      count++;
+    }
+    return (sumDist2 / count) < 4.0;
+  }
+
   /// Spawn particles from sampled pixel targets.
   ///
   /// Particle count is determined by:

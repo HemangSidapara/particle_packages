@@ -8,6 +8,7 @@ import 'text_demos/auto_morph.dart';
 import 'text_demos/custom_colors.dart';
 import 'text_demos/text_performance.dart';
 import 'text_demos/splash_demo.dart';
+import 'text_demos/pause_demo.dart';
 
 // Image demos
 import 'image_demos/full_screen_image.dart';
@@ -138,7 +139,8 @@ final _textDemos = [
   _Demo('Auto Morphing', 'Text cycles automatically', Icons.autorenew, () => const AutoMorphDemo()),
   _Demo('Custom Colors', 'Live HSL sliders', Icons.palette, () => const CustomColorsDemo()),
   _Demo('Performance', 'Density + FPS counter', Icons.speed, () => const TextPerformanceDemo()),
-  _Demo('Splash Screen', 'Animated app intro', Icons.launch, () => const SplashDemo()),
+  _Demo('Splash Screen', 'onReady-driven particle intro', Icons.launch, () => const SplashDemo()),
+  _Demo('Pause & Callbacks', 'onReady, onPause, onResume live log', Icons.pause_circle, () => const PauseDemo()),
 ];
 
 final _imageDemos = [

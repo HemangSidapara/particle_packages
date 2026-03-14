@@ -11,11 +11,14 @@ class SplashDemo extends StatefulWidget {
 class _SplashDemoState extends State<SplashDemo> {
   bool _showSplash = true;
   double _opacity = 1.0;
+  bool _particlesReady = false;
 
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
+  // Called by onReady — starts the fade 1 s after particles fully form.
+  // No arbitrary timer needed; sequencing is driven by the actual particle state.
+  void _onParticlesReady() {
+    if (!mounted) return;
+    setState(() => _particlesReady = true);
+    Future.delayed(const Duration(seconds: 1), () {
       if (mounted) setState(() => _opacity = 0.0);
     });
   }
@@ -28,10 +31,9 @@ class _SplashDemoState extends State<SplashDemo> {
     setState(() {
       _showSplash = true;
       _opacity = 1.0;
+      _particlesReady = false;
     });
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _opacity = 0.0);
-    });
+    // No timer here — onReady on the new ParticleText instance will drive the sequence.
   }
 
   @override
@@ -84,15 +86,20 @@ class _SplashDemoState extends State<SplashDemo> {
                 displacedColor: Color(0xFFB0C8FF),
                 backgroundColor: Color(0xFF020308),
               ),
+              onReady: _onParticlesReady,
             ),
             Positioned(
               bottom: MediaQuery.of(context).padding.bottom + 40,
               left: 0,
               right: 0,
               child: Center(
-                child: Text(
-                  'Loading...',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 13, letterSpacing: 2),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  child: Text(
+                    _particlesReady ? 'Launching...' : 'Forming particles...',
+                    key: ValueKey(_particlesReady),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontSize: 13, letterSpacing: 2),
+                  ),
                 ),
               ),
             ),

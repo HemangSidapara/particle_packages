@@ -36,8 +36,10 @@ Move your cursor or touch to scatter the particles!
 - **Network caching** — uses Flutter's built-in `ImageCache`; no extra dependencies
 - **Flutter icon support** — pass any `IconData` directly; rasterized internally
 - **Font Awesome support** — `ParticleImage.faIcon()` for `FaIconData` (v11+); `ParticleImage.icon()` for older FA versions
-- **Particle loading placeholder** — animated particle ring while network image loads; swappable with any widget or another `ParticleImage`
+- **Loading placeholder** — animated spinner while network image loads; swappable with any widget or another `ParticleImage`
 - **Fixed size** — optional `width`/`height` parameters; no need to wrap in `SizedBox`
+- **Pause / resume control** — manual `paused` param + auto-pause on app background and inactive tabs
+- **Lifecycle callbacks** — `onReady`, `onImageLoaded`, `onError`, `onPause`, `onResume`
 - **Dark pixel visibility** — dark image content (logos, text) stays visible as particles
 - **Powered by particle_core** — single GPU draw call, 10,000+ particles at 60fps
 - **Cross-platform** — iOS, Android, Web, macOS, Windows, Linux
@@ -82,8 +84,8 @@ ParticleImage.network(
 )
 ```
 
-While loading, a built-in **particle ring** animation is shown by default — 300 particles form a
-glowing circular loader shape. Override `placeholder` with any widget:
+While loading, a built-in **animated spinner** is shown by default — a glowing comet arc that
+spins until the image is ready. Override `placeholder` with any widget:
 
 ```dart
 // Default — animated particle ring
@@ -192,14 +194,59 @@ ParticleImage.icon(
 
 #### Common parameters (all constructors)
 
-| Parameter     | Type      | Default  | Description                                                   |
-|---------------|-----------|----------|---------------------------------------------------------------|
-| `config`      | `ParticleConfig` | `ParticleConfig()` | Particle physics and appearance          |
-| `expand`      | `bool`    | `true`   | Fill parent; ignored when `width`/`height` are set            |
-| `width`       | `double?` | `null`   | Fixed widget width — no `SizedBox` wrapper needed             |
-| `height`      | `double?` | `null`   | Fixed widget height — no `SizedBox` wrapper needed            |
-| `onImageLoaded` | `VoidCallback?` | `null` | Called when image is loaded and particles start forming |
-| `placeholder` | `Widget?` | `null`   | `.network()` only — `null` = particle ring, widget = custom, `SizedBox.shrink()` = none |
+| Parameter       | Type               | Default | Description |
+|-----------------|--------------------|---------|-------------|
+| `config`        | `ParticleConfig`   | `ParticleConfig()` | Particle physics and appearance |
+| `expand`        | `bool`             | `true`  | Fill parent; ignored when `width`/`height` are set |
+| `width`         | `double?`          | `null`  | Fixed widget width — no `SizedBox` wrapper needed |
+| `height`        | `double?`          | `null`  | Fixed widget height — no `SizedBox` wrapper needed |
+| `paused`        | `bool`             | `false` | Pause the physics ticker entirely |
+| `onImageLoaded` | `VoidCallback?`    | `null`  | Fires when image is loaded and particles start forming |
+| `onReady`       | `VoidCallback?`    | `null`  | Fires once when particles fully settle (avg displacement < 2 px) |
+| `onError`       | `VoidCallback?`    | `null`  | Fires when asset or network image fails to load |
+| `onPause`       | `VoidCallback?`    | `null`  | Fires when animation pauses (any source) |
+| `onResume`      | `VoidCallback?`    | `null`  | Fires when animation resumes (any source) |
+| `placeholder`   | `Widget?`          | `null`  | `.network()` only — `null` = particle ring, widget = custom, `SizedBox.shrink()` = none |
+
+### Pause and resume
+
+Stop the physics ticker entirely — zero CPU/GPU cost while paused:
+
+```dart
+ParticleImage.asset('assets/logo.png', paused: _isPaused)
+```
+
+Three pause sources are handled automatically:
+
+| Source | Behavior |
+|--------|----------|
+| `paused: true` | Manual — caller controls it |
+| App backgrounded | Auto-paused via `WidgetsBindingObserver` |
+| Inactive tab | Auto-paused via Flutter's `TickerMode` |
+
+### Callbacks
+
+```dart
+ParticleImage.network(
+  'https://example.com/logo.png',
+  onImageLoaded: () {
+    // Image decoded and particles are spawning (not yet settled).
+  },
+  onReady: () {
+    // Fires once when particles have fully settled into the image shape.
+    // More reliable than onImageLoaded for entrance animation sequencing.
+  },
+  onError: () {
+    // Asset or network load failed — show fallback UI here.
+  },
+  onPause: () {
+    // Animation paused — any source (manual, background, tab switch).
+  },
+  onResume: () {
+    // Animation resumed — any source.
+  },
+)
+```
 
 ### With configuration
 

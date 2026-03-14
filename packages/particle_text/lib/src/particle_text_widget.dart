@@ -34,32 +34,72 @@ class ParticleText extends StatefulWidget {
   /// Called when the text changes and particles begin morphing.
   final VoidCallback? onTextChanged;
 
+  /// Called once when particles have fully settled into the text shape
+  /// for the first time. Useful for sequencing splash screens or entrance
+  /// animations — fires when average particle displacement drops below 2px.
+  ///
+  /// Re-fires after a full config rebuild (e.g. [config] object changes).
+  final VoidCallback? onReady;
+
+  /// Whether the particle animation is paused.
+  ///
+  /// When `true`, the physics ticker stops completely — no CPU or GPU work.
+  /// Toggle reactively to pause/resume from code:
+  ///
+  /// ```dart
+  /// ParticleText(text: 'Hello', paused: _isPaused)
+  /// ```
+  ///
+  /// Tab switching is handled automatically by Flutter's [TickerMode]
+  /// (no extra wiring needed). App-backgrounding is handled automatically
+  /// via [WidgetsBindingObserver]. This flag is for explicit manual control.
+  final bool paused;
+
+  /// Called when the particle animation pauses for any reason:
+  /// [paused] set to `true`, app going to background, or widget entering
+  /// an inactive tab (via [TickerMode]).
+  final VoidCallback? onPause;
+
+  /// Called when the particle animation resumes after being paused:
+  /// [paused] set to `false`, app returning to foreground, or widget
+  /// entering an active tab (via [TickerMode]).
+  final VoidCallback? onResume;
+
   /// Creates a [ParticleText] that renders [text] as interactive particles.
   const ParticleText({
     super.key,
     required this.text,
     this.config = const ParticleConfig(),
     this.expand = true,
+    this.paused = false,
     this.onTextChanged,
+    this.onReady,
+    this.onPause,
+    this.onResume,
   });
 
   @override
   State<ParticleText> createState() => _ParticleTextState();
 }
 
-class _ParticleTextState extends State<ParticleText> with SingleTickerProviderStateMixin {
+class _ParticleTextState extends State<ParticleText> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late Ticker _ticker;
   late ParticleSystem _system;
   late ParticlePainter _painter;
   bool _initialized = false;
+  bool _readyFired = false;
+  bool _lifecyclePaused = false;
+  bool? _lastTickerMuted;
   Size _lastSize = Size.zero;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _system = ParticleSystem(config: widget.config);
     _painter = ParticlePainter(system: _system, config: widget.config);
-    _ticker = createTicker(_onTick)..start();
+    _ticker = createTicker(_onTick);
+    if (!widget.paused) _ticker.start();
   }
 
   @override
@@ -69,12 +109,17 @@ class _ParticleTextState extends State<ParticleText> with SingleTickerProviderSt
     final configChanged = oldWidget.config != widget.config;
     final textChanged = oldWidget.text != widget.text;
 
+    if (oldWidget.paused != widget.paused) {
+      _updateTickerState();
+    }
+
     if (configChanged) {
       // Config changed — rebuild the entire system
       _system.dispose();
       _system = ParticleSystem(config: widget.config);
       _painter = ParticlePainter(system: _system, config: widget.config);
       _initialized = false;
+      _readyFired = false;
       if (_lastSize != Size.zero) {
         _initSystem(_lastSize, MediaQuery.devicePixelRatioOf(context));
       }
@@ -87,15 +132,67 @@ class _ParticleTextState extends State<ParticleText> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
     _system.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    // super updates _ticker.muted via SingleTickerProviderStateMixin before we read it.
+    super.didChangeDependencies();
+    final muted = _ticker.muted;
+    if (_lastTickerMuted == null) {
+      // First call — record initial state without firing callbacks.
+      _lastTickerMuted = muted;
+      return;
+    }
+    if (muted == _lastTickerMuted) return;
+    _lastTickerMuted = muted;
+    // Only fire if no manual/lifecycle pause is in effect.
+    if (widget.paused || _lifecyclePaused) return;
+    if (!muted) {
+      widget.onResume?.call();
+    } else {
+      widget.onPause?.call();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final shouldPause = state == AppLifecycleState.paused;
+    if (shouldPause == _lifecyclePaused) return;
+    _lifecyclePaused = shouldPause;
+    _updateTickerState();
+  }
+
+  /// Starts or stops the ticker based on [widget.paused] and app lifecycle state.
+  /// The ticker runs only when both are unpaused. Fires [onPause]/[onResume]
+  /// on actual state transitions.
+  void _updateTickerState() {
+    final shouldRun = !widget.paused && !_lifecyclePaused;
+    if (shouldRun) {
+      if (!_ticker.isActive) {
+        _ticker.start();
+        widget.onResume?.call();
+      }
+    } else {
+      if (_ticker.isActive) {
+        _ticker.stop();
+        widget.onPause?.call();
+      }
+    }
   }
 
   void _onTick(Duration elapsed) {
     // Drives physics → builds render data → notifyListeners → painter repaints
     // NO setState — only the CustomPaint canvas repaints
     _system.tick();
+    if (!_readyFired && _system.isSettled) {
+      _readyFired = true;
+      widget.onReady?.call();
+    }
   }
 
   Future<void> _initSystem(Size size, double dpr) async {

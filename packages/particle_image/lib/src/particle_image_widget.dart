@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:particle_core/particle_core.dart';
+import 'particle_loading_indicator.dart';
 
 /// Renders an image as interactive particles.
 ///
@@ -102,6 +103,40 @@ class ParticleImage extends StatefulWidget {
   /// Called when the image is loaded and particles start forming.
   final VoidCallback? onImageLoaded;
 
+  /// Called once when particles have fully settled into the image shape.
+  /// Fires when average particle displacement drops below 2px.
+  ///
+  /// Re-fires after any full particle reset (image change, config change,
+  /// icon/color change). Useful for entrance animation sequencing.
+  final VoidCallback? onReady;
+
+  /// Called when an asset or network image fails to load.
+  final VoidCallback? onError;
+
+  /// Called when the particle animation pauses for any reason:
+  /// [paused] set to `true`, app going to background, or widget entering
+  /// an inactive tab (via [TickerMode]).
+  final VoidCallback? onPause;
+
+  /// Called when the particle animation resumes after being paused:
+  /// [paused] set to `false`, app returning to foreground, or widget
+  /// entering an active tab (via [TickerMode]).
+  final VoidCallback? onResume;
+
+  /// Whether the particle animation is paused.
+  ///
+  /// When `true`, the physics ticker stops completely — no CPU or GPU work.
+  /// Toggle reactively to pause/resume from code:
+  ///
+  /// ```dart
+  /// ParticleImage.asset('assets/logo.png', paused: _isPaused)
+  /// ```
+  ///
+  /// Tab switching is handled automatically by Flutter's [TickerMode]
+  /// (no extra wiring needed). App-backgrounding is handled automatically
+  /// via [WidgetsBindingObserver]. This flag is for explicit manual control.
+  final bool paused;
+
   /// Creates a ParticleImage from a pre-loaded [ui.Image].
   const ParticleImage({
     super.key,
@@ -110,7 +145,12 @@ class ParticleImage extends StatefulWidget {
     this.expand = true,
     this.width,
     this.height,
+    this.paused = false,
     this.onImageLoaded,
+    this.onReady,
+    this.onError,
+    this.onPause,
+    this.onResume,
   }) : assetPath = null,
        networkUrl = null,
        iconData = null,
@@ -127,7 +167,12 @@ class ParticleImage extends StatefulWidget {
     this.expand = true,
     this.width,
     this.height,
+    this.paused = false,
     this.onImageLoaded,
+    this.onReady,
+    this.onError,
+    this.onPause,
+    this.onResume,
   }) : image = null,
        networkUrl = null,
        iconData = null,
@@ -153,7 +198,12 @@ class ParticleImage extends StatefulWidget {
     this.expand = true,
     this.width,
     this.height,
+    this.paused = false,
     this.onImageLoaded,
+    this.onReady,
+    this.onError,
+    this.onPause,
+    this.onResume,
   }) : image = null,
        assetPath = null,
        iconData = null,
@@ -175,7 +225,12 @@ class ParticleImage extends StatefulWidget {
     this.expand = true,
     this.width,
     this.height,
+    this.paused = false,
     this.onImageLoaded,
+    this.onReady,
+    this.onError,
+    this.onPause,
+    this.onResume,
   }) : image = null,
        assetPath = null,
        networkUrl = null,
@@ -197,7 +252,12 @@ class ParticleImage extends StatefulWidget {
     this.expand = true,
     this.width,
     this.height,
+    this.paused = false,
     this.onImageLoaded,
+    this.onReady,
+    this.onError,
+    this.onPause,
+    this.onResume,
   }) : image = null,
        assetPath = null,
        networkUrl = null,
@@ -208,11 +268,14 @@ class ParticleImage extends StatefulWidget {
   State<ParticleImage> createState() => _ParticleImageState();
 }
 
-class _ParticleImageState extends State<ParticleImage> with SingleTickerProviderStateMixin {
+class _ParticleImageState extends State<ParticleImage> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late Ticker _ticker;
   late ParticleSystem _system;
   late ParticlePainter _painter;
   bool _initialized = false;
+  bool _readyFired = false;
+  bool _lifecyclePaused = false;
+  bool? _lastTickerMuted;
   Size _lastSize = Size.zero;
   ui.Image? _loadedImage;
   bool _iconRendering = false;
@@ -222,9 +285,11 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _system = ParticleSystem(config: widget.config);
     _painter = ParticlePainter(system: _system, config: widget.config);
-    _ticker = createTicker(_onTick)..start();
+    _ticker = createTicker(_onTick);
+    if (!widget.paused) _ticker.start();
 
     if (widget.assetPath != null) {
       _loadAsset(widget.assetPath!);
@@ -241,11 +306,16 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
 
     final configChanged = oldWidget.config != widget.config;
 
+    if (oldWidget.paused != widget.paused) {
+      _updateTickerState();
+    }
+
     if (configChanged) {
       _system.dispose();
       _system = ParticleSystem(config: widget.config);
       _painter = ParticlePainter(system: _system, config: widget.config);
       _initialized = false;
+      _readyFired = false;
       // Do NOT clear _loadedImage here. The decoded asset / rendered icon / ui.Image
       // is still valid — only the physics config changed. Clearing it would cause
       // .asset() to stall (image == null → _initSystem returns early) and force
@@ -258,6 +328,7 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
 
     if (oldWidget.image != widget.image && widget.image != null) {
       _initialized = false;
+      _readyFired = false;
       if (_lastSize != Size.zero) {
         _initSystem(_lastSize, MediaQuery.devicePixelRatioOf(context));
       }
@@ -266,6 +337,7 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
     if (oldWidget.assetPath != widget.assetPath && widget.assetPath != null) {
       _loadedImage = null;
       _initialized = false;
+      _readyFired = false;
       _loadAsset(widget.assetPath!);
     }
 
@@ -273,6 +345,7 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
       _disposeNetworkImage();
       _loadedImage = null;
       _initialized = false;
+      _readyFired = false;
       _loadNetwork(widget.networkUrl!);
     }
 
@@ -282,6 +355,7 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
             oldWidget.iconSize != widget.iconSize)) {
       _loadedImage = null;
       _initialized = false;
+      _readyFired = false;
       if (_lastSize != Size.zero) {
         _initSystem(_lastSize, MediaQuery.devicePixelRatioOf(context));
       }
@@ -293,6 +367,7 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
             oldWidget.iconSize != widget.iconSize)) {
       _loadedImage = null;
       _initialized = false;
+      _readyFired = false;
       if (_lastSize != Size.zero) {
         _initSystem(_lastSize, MediaQuery.devicePixelRatioOf(context));
       }
@@ -307,18 +382,22 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
   }
 
   Future<void> _loadAsset(String path) async {
-    final data = await rootBundle.load(path);
-    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-    final frame = await codec.getNextFrame();
-    _loadedImage = frame.image;
+    try {
+      final data = await rootBundle.load(path);
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final frame = await codec.getNextFrame();
+      _loadedImage = frame.image;
 
-    _initialized = false;
-    if (_lastSize != Size.zero) {
-      if (mounted) {
-        _initSystem(_lastSize, MediaQuery.devicePixelRatioOf(context));
+      _initialized = false;
+      if (_lastSize != Size.zero) {
+        if (mounted) {
+          _initSystem(_lastSize, MediaQuery.devicePixelRatioOf(context));
+        }
+      } else {
+        if (mounted) setState(() {});
       }
-    } else {
-      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) widget.onError?.call();
     }
   }
 
@@ -355,7 +434,10 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
       // call it here — the rebuild will invoke it with the correct size.
       setState(() => _networkLoading = false);
     } catch (_) {
-      if (mounted) setState(() => _networkLoading = false);
+      if (mounted) {
+        setState(() => _networkLoading = false);
+        widget.onError?.call();
+      }
     }
   }
 
@@ -398,14 +480,64 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _disposeNetworkImage();
     _ticker.dispose();
     _system.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    // super updates _ticker.muted via SingleTickerProviderStateMixin before we read it.
+    super.didChangeDependencies();
+    final muted = _ticker.muted;
+    if (_lastTickerMuted == null) {
+      _lastTickerMuted = muted;
+      return;
+    }
+    if (muted == _lastTickerMuted) return;
+    _lastTickerMuted = muted;
+    if (widget.paused || _lifecyclePaused) return;
+    if (!muted) {
+      widget.onResume?.call();
+    } else {
+      widget.onPause?.call();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final shouldPause = state == AppLifecycleState.paused;
+    if (shouldPause == _lifecyclePaused) return;
+    _lifecyclePaused = shouldPause;
+    _updateTickerState();
+  }
+
+  /// Starts or stops the ticker based on [widget.paused] and app lifecycle state.
+  /// The ticker runs only when both are unpaused. Fires [onPause]/[onResume]
+  /// on actual state transitions.
+  void _updateTickerState() {
+    final shouldRun = !widget.paused && !_lifecyclePaused;
+    if (shouldRun) {
+      if (!_ticker.isActive) {
+        _ticker.start();
+        widget.onResume?.call();
+      }
+    } else {
+      if (_ticker.isActive) {
+        _ticker.stop();
+        widget.onPause?.call();
+      }
+    }
+  }
+
   void _onTick(Duration elapsed) {
     _system.tick();
+    if (!_readyFired && _system.isSettled) {
+      _readyFired = true;
+      widget.onReady?.call();
+    }
   }
 
   Future<void> _initSystem(Size size, double dpr) async {
@@ -465,7 +597,7 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     if (_networkLoading) {
-      final ph = widget.placeholder ?? _ParticleLoadingIndicator(backgroundColor: widget.config.backgroundColor);
+      final ph = widget.placeholder ?? ParticleLoadingIndicator(backgroundColor: widget.config.backgroundColor);
       return _wrapSize(ph);
     }
 
@@ -498,138 +630,5 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
     );
 
     return _wrapSize(canvas);
-  }
-}
-
-/// Built-in particle loading indicator shown while a network image loads.
-///
-/// Draws a ring onto a canvas and feeds it to [ParticleSystem.setImage], so
-/// particles form a circular shape and scatter/reform while loading.
-class _ParticleLoadingIndicator extends StatefulWidget {
-  final Color backgroundColor;
-
-  const _ParticleLoadingIndicator({required this.backgroundColor});
-
-  @override
-  State<_ParticleLoadingIndicator> createState() => _ParticleLoadingIndicatorState();
-}
-
-class _ParticleLoadingIndicatorState extends State<_ParticleLoadingIndicator> with SingleTickerProviderStateMixin {
-  late Ticker _ticker;
-  late ParticleSystem _system;
-  late ParticlePainter _painter;
-  bool _initialized = false;
-  Size _lastSize = Size.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    final config = ParticleConfig(
-      particleCount: 300,
-      backgroundColor: widget.backgroundColor,
-      drawBackground: true,
-      showPointerGlow: false,
-      returnSpeed: 0.025,
-      friction: 0.91,
-      repelForce: 4.0,
-    );
-    _system = ParticleSystem(config: config);
-    _painter = ParticlePainter(system: _system, config: config);
-    _ticker = createTicker((_) => _system.tick())..start();
-  }
-
-  /// Draws a glowing ring onto a [ui.Image] that the particle system uses as
-  /// its target layout. The ring is a fixed loader-sized circle (radius ~36 logical px).
-  Future<ui.Image> _buildRingImage(Size size, double dpr) async {
-    final pw = (size.width * dpr).ceil().clamp(1, 4096);
-    final ph = (size.height * dpr).ceil().clamp(1, 4096);
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final cx = pw / 2.0;
-    final cy = ph / 2.0;
-    // Fixed logical radius of 36px — like a standard circular progress indicator.
-    final r = 36.0 * dpr;
-    final strokeW = 4.0 * dpr;
-
-    // Outer soft glow ring
-    canvas.drawCircle(
-      Offset(cx, cy),
-      r,
-      Paint()
-        ..color = const Color(0xFF8CAADE).withValues(alpha: 0.35)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeW * 2.2
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-    );
-    // Main ring
-    canvas.drawCircle(
-      Offset(cx, cy),
-      r,
-      Paint()
-        ..color = const Color(0xFF8CAADE)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeW,
-    );
-    // Bright inner ring
-    canvas.drawCircle(
-      Offset(cx, cy),
-      r,
-      Paint()
-        ..color = const Color(0xFFDCE5FF).withValues(alpha: 0.6)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeW * 0.35,
-    );
-
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(pw, ph);
-    picture.dispose();
-    return image;
-  }
-
-  Future<void> _init(Size size, double dpr) async {
-    if (_initialized && _lastSize == size) return;
-    _lastSize = size;
-    _system.screenSize = size;
-    _system.devicePixelRatio = dpr;
-    if (_system.sprite == null) await _system.init();
-    _initialized = true;
-    final ringImage = await _buildRingImage(size, dpr);
-    await _system.setImage(ringImage, size);
-  }
-
-  @override
-  void dispose() {
-    _ticker.dispose();
-    _system.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    return SizedBox.expand(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, constraints.maxHeight);
-          _init(size, dpr);
-          return RepaintBoundary(
-            child: GestureDetector(
-              onPanUpdate: (d) => _system.pointer = d.localPosition,
-              onPanEnd: (_) => _system.pointer = const Offset(-9999, -9999),
-              child: MouseRegion(
-                onHover: (e) => _system.pointer = e.localPosition,
-                onExit: (_) => _system.pointer = const Offset(-9999, -9999),
-                cursor: SystemMouseCursors.none,
-                child: CustomPaint(
-                  size: size,
-                  painter: _painter,
-                  willChange: true,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
   }
 }
