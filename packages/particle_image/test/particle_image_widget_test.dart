@@ -249,6 +249,80 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
+    testWidgets('widget constructor renders child as particles', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ParticleImage.widget(
+              Text('Hello', style: TextStyle(fontSize: 48, color: Colors.white)),
+              config: ParticleConfig(maxParticleCount: 50),
+            ),
+          ),
+        ),
+      );
+      // First frame lays out the hidden child; post-frame callback captures it.
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.byType(ParticleImage), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(ParticleImage), matching: find.byType(CustomPaint)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('widget constructor includes child in tree for capture', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ParticleImage.widget(
+              Icon(Icons.star, size: 100, color: Colors.amber),
+              config: ParticleConfig(maxParticleCount: 50),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // The child widget should be in the tree (behind canvas, for capture).
+      expect(find.byIcon(Icons.star), findsOneWidget);
+      // Stack is used to layer child + particle canvas.
+      expect(
+        find.descendant(of: find.byType(ParticleImage), matching: find.byType(Stack)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('widget constructor handles child change', (tester) async {
+      Widget child = const Text('A', style: TextStyle(fontSize: 48));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                return GestureDetector(
+                  onTap: () => setState(() => child = const Text('B', style: TextStyle(fontSize: 48))),
+                  child: ParticleImage.widget(
+                    child,
+                    config: const ParticleConfig(maxParticleCount: 50),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Change the child widget.
+      await tester.tap(find.byType(GestureDetector).first);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.byType(ParticleImage), findsOneWidget);
+      expect(find.text('B'), findsOneWidget);
+    });
+
     testWidgets('icon mode handles iconColor change without crashing', (tester) async {
       Color color = Colors.white;
 

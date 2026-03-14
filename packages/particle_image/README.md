@@ -32,6 +32,7 @@ Move your cursor or touch to scatter the particles!
 - **Per-pixel color** — each particle takes the color of its source pixel
 - **Touch & hover interaction** — particles scatter and reform
 - **Auto background detection** — automatically filters out solid backgrounds
+- **Any Flutter widget as particles** — `ParticleImage.widget(child)` rasterizes any widget and renders it as particles
 - **Asset, network & runtime images** — load from assets, URLs, or any `ui.Image`
 - **Network caching** — uses Flutter's built-in `ImageCache`; no extra dependencies
 - **Flutter icon support** — pass any `IconData` directly; rasterized internally
@@ -109,6 +110,25 @@ ParticleImage.network(
   placeholder: SizedBox.shrink(),
 )
 ```
+
+### From any Flutter widget
+
+Turn **any** widget into interactive particles — cards, buttons, icons, custom painters, anything:
+
+```dart
+ParticleImage.widget(
+  Card(
+    child: Padding(
+      padding: EdgeInsets.all(24),
+      child: Text('Hello', style: TextStyle(fontSize: 48, color: Colors.white)),
+    ),
+  ),
+  config: ParticleConfig.cosmic(),
+)
+```
+
+The widget is rasterized internally via `RepaintBoundary` + `toImage()` — no manual conversion needed.
+It captures the widget at its natural size and renders the result as particles.
 
 ### Fixed size
 

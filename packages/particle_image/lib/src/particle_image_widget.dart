@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -53,6 +54,14 @@ import 'particle_loading_indicator.dart';
 ///   iconSize: 250,
 /// )
 /// ```
+///
+/// To render any Flutter widget as particles:
+/// ```dart
+/// ParticleImage.widget(
+///   Card(child: Text('Hello')),
+///   config: ParticleConfig.cosmic(),
+/// )
+/// ```
 class ParticleImage extends StatefulWidget {
   /// A pre-loaded [ui.Image] to render as particles.
   final ui.Image? image;
@@ -71,6 +80,13 @@ class ParticleImage extends StatefulWidget {
   /// A Font Awesome [FaIconData] to rasterize and render as particles.
   /// Requires [font_awesome_flutter] in your app's pubspec.
   final FaIconData? faIconData;
+
+  /// An arbitrary Flutter widget to rasterize and render as particles.
+  ///
+  /// The widget is rendered offscreen via [RepaintBoundary] + [RenderRepaintBoundary.toImage],
+  /// then fed into the particle system exactly like any other image source.
+  /// Supports any widget — text, containers, icons, custom painters, etc.
+  final Widget? child;
 
   /// Fill color used when rasterizing [iconData] or [faIconData]. Defaults to [Colors.white].
   final Color iconColor;
@@ -155,6 +171,7 @@ class ParticleImage extends StatefulWidget {
        networkUrl = null,
        iconData = null,
        faIconData = null,
+       child = null,
        iconColor = Colors.white,
        iconSize = 200.0,
        placeholder = null;
@@ -177,6 +194,7 @@ class ParticleImage extends StatefulWidget {
        networkUrl = null,
        iconData = null,
        faIconData = null,
+       child = null,
        iconColor = Colors.white,
        iconSize = 200.0,
        placeholder = null;
@@ -208,6 +226,7 @@ class ParticleImage extends StatefulWidget {
        assetPath = null,
        iconData = null,
        faIconData = null,
+       child = null,
        iconColor = Colors.white,
        iconSize = 200.0;
 
@@ -235,6 +254,7 @@ class ParticleImage extends StatefulWidget {
        assetPath = null,
        networkUrl = null,
        faIconData = null,
+       child = null,
        placeholder = null;
 
   /// Creates a ParticleImage from a Font Awesome [FaIconData]
@@ -262,6 +282,49 @@ class ParticleImage extends StatefulWidget {
        assetPath = null,
        networkUrl = null,
        iconData = null,
+       child = null,
+       placeholder = null;
+
+  /// Creates a ParticleImage from any Flutter widget.
+  ///
+  /// The [child] widget is rendered offscreen and captured as a raster image,
+  /// then displayed as interactive particles. Supports any widget — text,
+  /// containers, icons, custom painters, etc.
+  ///
+  /// The child receives the same layout constraints as the particle canvas,
+  /// so it is rasterized at the exact size it would occupy on screen.
+  ///
+  /// ```dart
+  /// ParticleImage.widget(
+  ///   Card(
+  ///     child: Padding(
+  ///       padding: EdgeInsets.all(24),
+  ///       child: Text('Hello', style: TextStyle(fontSize: 48)),
+  ///     ),
+  ///   ),
+  ///   config: ParticleConfig.cosmic(),
+  /// )
+  /// ```
+  const ParticleImage.widget(
+    this.child, {
+    super.key,
+    this.config = const ParticleConfig(),
+    this.expand = true,
+    this.width,
+    this.height,
+    this.paused = false,
+    this.onImageLoaded,
+    this.onReady,
+    this.onError,
+    this.onPause,
+    this.onResume,
+  }) : image = null,
+       assetPath = null,
+       networkUrl = null,
+       iconData = null,
+       faIconData = null,
+       iconColor = Colors.white,
+       iconSize = 200.0,
        placeholder = null;
 
   @override
@@ -281,6 +344,10 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
   bool _iconRendering = false;
   bool _networkLoading = false;
   bool _networkImageOwned = false;
+  final GlobalKey _childBoundaryKey = GlobalKey();
+  bool _childCapturing = false;
+  bool _childCaptured = false;
+  bool _childImageOwned = false;
 
   @override
   void initState() {
@@ -372,12 +439,68 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
         _initSystem(_lastSize, MediaQuery.devicePixelRatioOf(context));
       }
     }
+
+    if (widget.child != null && !identical(oldWidget.child, widget.child)) {
+      _disposeChildImage();
+      _loadedImage = null;
+      _childCaptured = false;
+      _initialized = false;
+      _readyFired = false;
+      if (_lastSize != Size.zero) {
+        _initSystem(_lastSize, MediaQuery.devicePixelRatioOf(context));
+      }
+    }
   }
 
   void _disposeNetworkImage() {
     if (_networkImageOwned) {
       _loadedImage?.dispose();
       _networkImageOwned = false;
+    }
+  }
+
+  void _disposeChildImage() {
+    if (_childImageOwned) {
+      _loadedImage?.dispose();
+      _childImageOwned = false;
+    }
+  }
+
+  /// Captures the offscreen child widget as a [ui.Image] via [RenderRepaintBoundary.toImage].
+  Future<void> _captureChild(double dpr) async {
+    if (_childCapturing) return;
+    _childCapturing = true;
+
+    try {
+      final boundary = _childBoundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null || !boundary.hasSize) {
+        _childCapturing = false;
+        // Child not ready yet — retry next frame.
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _captureChild(dpr);
+        });
+        return;
+      }
+
+      final image = await boundary.toImage(pixelRatio: dpr);
+      if (!mounted) {
+        image.dispose();
+        return;
+      }
+
+      _disposeChildImage();
+      _loadedImage = image;
+      _childImageOwned = true;
+      _childCaptured = true;
+      _initialized = false;
+
+      if (_lastSize != Size.zero) {
+        _initSystem(_lastSize, dpr);
+      }
+    } catch (_) {
+      if (mounted) widget.onError?.call();
+    } finally {
+      _childCapturing = false;
     }
   }
 
@@ -482,6 +605,7 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _disposeNetworkImage();
+    _disposeChildImage();
     _ticker.dispose();
     _system.dispose();
     super.dispose();
@@ -572,8 +696,18 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
       return;
     }
 
+    // Capture child widget on first call (or after child change).
+    final needsChildCapture = widget.child != null && !_childCaptured;
+    if (needsChildCapture && !_childCapturing) {
+      // Schedule capture after this frame — child must be painted first.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _captureChild(dpr);
+      });
+      return;
+    }
+
     final image = widget.image ?? _loadedImage;
-    if (image == null) return; // asset/icon/network still loading
+    if (image == null) return; // asset/icon/network/child still loading
 
     if (_initialized && !sizeChanged) return;
     _initialized = true;
@@ -628,6 +762,27 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
         );
       },
     );
+
+    // When using .widget(), include the child behind the canvas for rasterization
+    // capture. The child takes its natural size (not Positioned.fill, which would
+    // force it to expand and capture the entire background). The particle canvas
+    // fills on top, hiding the child. RenderRepaintBoundary.toImage() captures
+    // only the child's actual painted area.
+    if (widget.child != null) {
+      return _wrapSize(
+        Stack(
+          children: [
+            Center(
+              child: RepaintBoundary(
+                key: _childBoundaryKey,
+                child: widget.child!,
+              ),
+            ),
+            Positioned.fill(child: canvas),
+          ],
+        ),
+      );
+    }
 
     return _wrapSize(canvas);
   }

@@ -18,6 +18,7 @@ import 'image_demos/image_performance.dart';
 import 'image_demos/icon_demo.dart';
 import 'image_demos/ui_image_demo.dart';
 import 'image_demos/network_image_demo.dart';
+import 'image_demos/widget_demo.dart';
 
 // Real-world
 import 'real_world/portfolio_landing.dart';
@@ -151,6 +152,7 @@ final _imageDemos = [
   _Demo('Icon Particles', 'Material & Font Awesome icons', Icons.emoji_emotions, () => const IconParticleDemo()),
   _Demo('Custom ui.Image', 'Canvas-drawn image as particles', Icons.brush, () => const UiImageDemo()),
   _Demo('Network Image', 'Load from URL with particle placeholder', Icons.cloud_download, () => const NetworkImageDemo()),
+  _Demo('Widget → Particles', 'Any Flutter widget as particles', Icons.widgets, () => const WidgetParticleDemo()),
 ];
 
 final _realWorldDemos = [
