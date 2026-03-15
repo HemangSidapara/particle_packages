@@ -1,17 +1,17 @@
 {
-    "name": "particle_examples",
-    "short_name": "particle_examples",
+    "name": "Particle Examples",
+    "short_name": "Particle Examples",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
+    "background_color": "#080a1c",
+    "theme_color": "#080a1c",
     "description": "A new Flutter project.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
         {
-            "src": "icons/Icon-192.png",
-            "sizes": "192x192",
+            "src": "icons/Icon-256.png",
+            "sizes": "256x256",
             "type": "image/png"
         },
         {
@@ -20,8 +20,8 @@
             "type": "image/png"
         },
         {
-            "src": "icons/Icon-maskable-192.png",
-            "sizes": "192x192",
+            "src": "icons/Icon-maskable-256.png",
+            "sizes": "256x256",
             "type": "image/png",
             "purpose": "maskable"
         },
