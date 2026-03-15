@@ -59,6 +59,9 @@ class ParticleSystem extends ChangeNotifier {
   /// Whether particles use per-particle colors (image mode).
   bool usePerParticleColor = false;
 
+  /// Whether the current image came from a widget capture.
+  bool _isWidgetCapture = false;
+
   /// Pre-rendered soft circle texture.
   ui.Image? sprite;
 
@@ -97,11 +100,33 @@ class ParticleSystem extends ChangeNotifier {
   /// The image is scaled to fit within [size] while preserving aspect ratio.
   /// Particle count is calculated from the drawn image area and density.
   /// Always does a full particle reset since image content is entirely different.
-  Future<void> setImage(ui.Image image, Size size) async {
-    final result = await _getImagePixels(image, size);
+  ///
+  /// When [skipBackgroundDetection] is `true`, corner/edge background color
+  /// detection is disabled. Use this for widget captures where the rasterized
+  /// image already has transparent pixels outside the content area.
+  Future<void> setImage(
+    ui.Image image,
+    Size size, {
+    bool skipBackgroundDetection = false,
+  }) async {
+    final result = await _getImagePixels(image, size, skipBackgroundDetection: skipBackgroundDetection);
     if (result.samples.isEmpty) return;
     usePerParticleColor = true;
-    _applyPixels(result, size, forceReset: true);
+    _isWidgetCapture = skipBackgroundDetection;
+    // Widget captures need a density multiplier that scales with how much of
+    // the image is filled. Sparse widgets (Logo Stack, ~15% fill) need ~3-4x;
+    // solid-fill widgets (Gradient Box, ~95% fill) need ~10x for full coverage
+    // (thin text strokes require high density to remain visible).
+    final _SampleResult effectiveResult;
+    if (skipBackgroundDetection) {
+      final totalPixels = image.width * image.height;
+      final fillRatio = totalPixels > 0 ? (result.samples.length / totalPixels).clamp(0.0, 1.0) : 0.0;
+      final multiplier = (2.0 + fillRatio * 8.0) * config.widgetDensityMultiplier;
+      effectiveResult = _SampleResult(result.samples, result.contentArea * multiplier);
+    } else {
+      effectiveResult = result;
+    }
+    _applyPixels(effectiveResult, size, forceReset: true);
   }
 
   void _applyPixels(_SampleResult result, Size size, {bool forceReset = false}) {
@@ -218,16 +243,19 @@ class ParticleSystem extends ChangeNotifier {
         // Very dark colors (luminance < minLum) are boosted proportionally
         // to maintain visibility at small particle sizes while preserving
         // relative hue and saturation.
-        final luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-        const double minLum = 80;
-        if (luminance < minLum && luminance > 0) {
-          final scale = minLum / luminance;
-          r = (r * scale).round().clamp(0, 255);
-          g = (g * scale).round().clamp(0, 255);
-          b = (b * scale).round().clamp(0, 255);
-        } else if (luminance == 0) {
-          // Pure black — assign a visible neutral gray
-          r = g = b = minLum.toInt();
+        // Skip for widget captures — dark colors are intentional UI design.
+        if (!_isWidgetCapture) {
+          final luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+          const double minLum = 80;
+          if (luminance < minLum && luminance > 0) {
+            final scale = minLum / luminance;
+            r = (r * scale).round().clamp(0, 255);
+            g = (g * scale).round().clamp(0, 255);
+            b = (b * scale).round().clamp(0, 255);
+          } else if (luminance == 0) {
+            // Pure black — assign a visible neutral gray
+            r = g = b = minLum.toInt();
+          }
         }
 
         final a = (p.alpha * 255).toInt().clamp(0, 255);
@@ -302,8 +330,15 @@ class ParticleSystem extends ChangeNotifier {
     final count = min(densityCount, samples.length);
 
     final maxDist = max(size.width, size.height);
-    final sizeRange = config.maxParticleSize - config.minParticleSize;
-    final alphaRange = config.maxAlpha - config.minAlpha;
+    // Widget captures use tighter size range [1.0, 1.6] for uniform coverage
+    // with enough overlap to preserve thin text strokes.
+    // Regular modes use the configured min/max particle sizes.
+    final effectiveMinSize = _isWidgetCapture ? 1.0 : config.minParticleSize;
+    final effectiveMaxSize = _isWidgetCapture ? 1.6 : config.maxParticleSize;
+    final sizeRange = effectiveMaxSize - effectiveMinSize;
+    // Widget captures use higher alpha floor (0.85) to avoid dark semi-transparent particles.
+    final effectiveMinAlpha = _isWidgetCapture ? 0.85 : config.minAlpha;
+    final alphaRange = config.maxAlpha - effectiveMinAlpha;
     final cx = size.width / 2;
     final cy = size.height / 2;
 
@@ -311,13 +346,18 @@ class ParticleSystem extends ChangeNotifier {
     // positions so particles cover the full text uniformly — not just
     // the top-left portion (samples are scanned left→right, top→bottom).
     // e.g. 5000 particles from 15000 samples → take every 3rd sample.
+    // Widget captures shuffle instead to avoid grid banding on solid-fill
+    // areas while ensuring no duplicate positions (maximizes coverage).
     final bool needsStride = count < samples.length;
+    if (_isWidgetCapture) samples.shuffle(_rng);
 
     for (int i = 0; i < count; i++) {
-      final sampleIdx = needsStride
-          ? (i * samples.length) ~/
-                count // uniform spread
-          : i % samples.length; // wrap when more particles than samples
+      final sampleIdx = _isWidgetCapture
+          ? i // shuffled — direct index, no duplicates
+          : (needsStride
+                ? (i * samples.length) ~/
+                      count // uniform stride
+                : i % samples.length); // wrap when more particles than samples
       final s = samples[sampleIdx];
       final angle = _rng.nextDouble() * pi * 2;
       final dist = _rng.nextDouble() * maxDist;
@@ -327,8 +367,8 @@ class ParticleSystem extends ChangeNotifier {
           y: cy + sin(angle) * dist,
           tx: s.x,
           ty: s.y,
-          size: _rng.nextDouble() * sizeRange + config.minParticleSize,
-          alpha: _rng.nextDouble() * alphaRange + config.minAlpha,
+          size: _rng.nextDouble() * sizeRange + effectiveMinSize,
+          alpha: _rng.nextDouble() * alphaRange + effectiveMinAlpha,
           targetColor: s.color,
         ),
       );
@@ -347,8 +387,11 @@ class ParticleSystem extends ChangeNotifier {
     if (targetCount > current) {
       // Add more particles at random positions (they'll morph to targets)
       final maxDist = max(size.width, size.height);
-      final sizeRange = config.maxParticleSize - config.minParticleSize;
-      final alphaRange = config.maxAlpha - config.minAlpha;
+      final effectiveMinSize = _isWidgetCapture ? 1.0 : config.minParticleSize;
+      final effectiveMaxSize = _isWidgetCapture ? 1.6 : config.maxParticleSize;
+      final sizeRange = effectiveMaxSize - effectiveMinSize;
+      final effectiveMinAlpha = _isWidgetCapture ? 0.85 : config.minAlpha;
+      final alphaRange = config.maxAlpha - effectiveMinAlpha;
       final cx = size.width / 2;
       final cy = size.height / 2;
 
@@ -361,8 +404,8 @@ class ParticleSystem extends ChangeNotifier {
             y: cy + sin(angle) * dist,
             tx: cx,
             ty: cy,
-            size: _rng.nextDouble() * sizeRange + config.minParticleSize,
-            alpha: _rng.nextDouble() * alphaRange + config.minAlpha,
+            size: _rng.nextDouble() * sizeRange + effectiveMinSize,
+            alpha: _rng.nextDouble() * alphaRange + effectiveMinAlpha,
           ),
         );
       }
@@ -517,6 +560,7 @@ class ParticleSystem extends ChangeNotifier {
     ui.Image image,
     Size size, {
     Color? skipColor,
+    bool skipBackgroundDetection = false,
   }) async {
     final imgW = image.width;
     final imgH = image.height;
@@ -536,35 +580,55 @@ class ParticleSystem extends ChangeNotifier {
     }
     final actualH = min(imgH, raw.length ~/ (stride * 4));
 
-    // Auto-detect background color from corner pixels
-    final bgColor = skipColor ?? _detectBackgroundColor(raw, stride, imgW, actualH);
+    // Auto-detect background color from corner/edge pixels.
+    final bgColor = skipBackgroundDetection
+        ? skipColor
+        : (skipColor ?? _detectBackgroundColor(raw, stride, imgW, actualH));
 
-    // Compute how the image fits within the widget (centered, aspect-fit)
-    final imgAspect = imgW / imgH;
-    final widgetAspect = size.width / size.height;
-
+    // Compute the drawn area for particle position mapping.
     double drawW, drawH;
-    if (imgAspect > widgetAspect) {
-      drawW = size.width * 0.85;
-      drawH = drawW / imgAspect;
+    double srcOffX = 0, srcOffY = 0;
+    double srcW = imgW.toDouble(), srcH = imgH.toDouble();
+
+    if (skipBackgroundDetection) {
+      // Widget captures: preserve the widget's original logical size.
+      // The image was captured at devicePixelRatio, so dividing gives logical px.
+      // This prevents the particle version from being enlarged to fill the canvas.
+      drawW = imgW / devicePixelRatio;
+      drawH = imgH / devicePixelRatio;
     } else {
-      drawH = size.height * 0.85;
-      drawW = drawH * imgAspect;
+      // Regular images: scale according to config.imageFit.
+      final fittedSizes = applyBoxFit(
+        config.imageFit,
+        Size(imgW.toDouble(), imgH.toDouble()),
+        size,
+      );
+
+      // Source region of the image to sample (may crop for cover/fitWidth/etc.)
+      srcW = fittedSizes.source.width;
+      srcH = fittedSizes.source.height;
+      srcOffX = (imgW - srcW) / 2;
+      srcOffY = (imgH - srcH) / 2;
+
+      drawW = fittedSizes.destination.width;
+      drawH = fittedSizes.destination.height;
     }
 
     // Content area in logical pixels² — the area the image actually
-    // occupies on screen after aspect-fit scaling.
+    // occupies on screen after scaling.
     // Used by density formula: count = contentArea × density / 100,000
     final contentArea = drawW * drawH;
 
     final offsetX = (size.width - drawW) / 2;
     final offsetY = (size.height - drawH) / 2;
 
-    final scaleX = drawW / imgW;
-    final scaleY = drawH / imgH;
+    final scaleX = drawW / srcW;
+    final scaleY = drawH / srcH;
 
     final List<_PixelSample> points = [];
-    final int gap = max(1, config.sampleGap);
+    // Widget captures: sample every pixel so thin text strokes (1-2px) always
+    // have target positions. Regular images use the configured sampleGap.
+    final int gap = skipBackgroundDetection ? 1 : max(1, config.sampleGap);
 
     // Background matching tolerance (±threshold per channel)
     const int tolerance = 30;
@@ -572,8 +636,14 @@ class ParticleSystem extends ChangeNotifier {
     final int bgG = bgColor != null ? (bgColor.g * 255.0).round().clamp(0, 255) : -1000;
     final int bgB = bgColor != null ? (bgColor.b * 255.0).round().clamp(0, 255) : -1000;
 
-    for (int y = 0; y < actualH; y += gap) {
-      for (int x = 0; x < imgW; x += gap) {
+    // Iterate over the source region (full image for contain/widget, cropped for cover/etc.)
+    final srcStartX = srcOffX.round();
+    final srcStartY = srcOffY.round();
+    final srcEndX = (srcOffX + srcW).round().clamp(0, imgW);
+    final srcEndY = (srcOffY + srcH).round().clamp(0, actualH);
+
+    for (int y = srcStartY; y < srcEndY; y += gap) {
+      for (int x = srcStartX; x < srcEndX; x += gap) {
         final i = (y * stride + x) * 4;
         if (i + 3 >= raw.length) continue;
 
@@ -582,8 +652,10 @@ class ParticleSystem extends ChangeNotifier {
         final b = raw[i + 2];
         final a = raw[i + 3];
 
-        // Skip transparent pixels
-        if (a < 30) continue;
+        // Skip transparent pixels. Widget captures use a lower threshold
+        // because even very faint pixels (e.g. glass/frosted overlays at 5%
+        // alpha) are intentional content that should be reproduced.
+        if (a < (skipBackgroundDetection ? 2 : 30)) continue;
 
         // Skip background color (auto-detected or user-specified)
         if (bgColor != null &&
@@ -594,8 +666,8 @@ class ParticleSystem extends ChangeNotifier {
         }
 
         final color = (a << 24) | (r << 16) | (g << 8) | b;
-        final logX = x * scaleX + offsetX;
-        final logY = y * scaleY + offsetY;
+        final logX = (x - srcOffX) * scaleX + offsetX;
+        final logY = (y - srcOffY) * scaleY + offsetY;
 
         points.add(_PixelSample(logX, logY, color));
       }
@@ -634,7 +706,6 @@ class ParticleSystem extends ChangeNotifier {
 
     if (colors.length < 4) return null;
 
-    // Count how many samples are similar to the first corner
     final ref = colors[0];
     const t = 30;
     int matches = 0;
@@ -644,9 +715,7 @@ class ParticleSystem extends ChangeNotifier {
       }
     }
 
-    // If majority of samples match, it's the background
     if (matches >= (colors.length * 0.6).ceil()) {
-      // If all corners are transparent, no need for color filter
       if (ref.$4 < 30) return null;
       return Color.fromARGB(ref.$4, ref.$1, ref.$2, ref.$3);
     }

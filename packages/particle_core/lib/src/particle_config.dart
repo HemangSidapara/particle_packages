@@ -115,6 +115,34 @@ class ParticleConfig {
   /// ```
   final int sampleGap;
 
+  /// Scale factor for particle density when rendering widget captures
+  /// via [ParticleImage.widget()].
+  ///
+  /// The particle system auto-computes density based on how much of the
+  /// widget is filled vs transparent. This multiplier scales that result:
+  /// - `1.0` (default) — adaptive density, no change
+  /// - `2.0` — double the particles (denser, better coverage for faint content)
+  /// - `0.5` — half the particles (better performance, more sparse)
+  ///
+  /// Only affects [ParticleImage.widget()] — has no effect on text, image,
+  /// icon, or network constructors.
+  final double widgetDensityMultiplier;
+
+  /// How the source image is inscribed into the particle canvas.
+  ///
+  /// Controls scaling when the image aspect ratio doesn't match the widget.
+  /// Uses standard Flutter [BoxFit] semantics:
+  /// - [BoxFit.contain] (default) — scales to fit entirely within the canvas.
+  /// - [BoxFit.cover] — scales to fill the canvas, cropping edges as needed.
+  /// - [BoxFit.fill] — stretches to fill the canvas exactly.
+  /// - [BoxFit.fitWidth] / [BoxFit.fitHeight] — scales to match one axis.
+  /// - [BoxFit.scaleDown] — like contain but never scales up.
+  /// - [BoxFit.none] — no scaling, centered at original size.
+  ///
+  /// Only affects regular images and icons. Has no effect on widget captures
+  /// (which preserve their original logical size) or text.
+  final BoxFit imageFit;
+
   /// Font weight used for rendering the text shape.
   final FontWeight fontWeight;
 
@@ -169,6 +197,8 @@ class ParticleConfig {
     this.minAlpha = 0.5,
     this.maxAlpha = 1.0,
     this.sampleGap = 2,
+    this.widgetDensityMultiplier = 1.0,
+    this.imageFit = BoxFit.contain,
     this.fontWeight = FontWeight.bold,
     this.fontFamily,
     this.fontSize,
@@ -232,6 +262,8 @@ class ParticleConfig {
         minAlpha == other.minAlpha &&
         maxAlpha == other.maxAlpha &&
         sampleGap == other.sampleGap &&
+        widgetDensityMultiplier == other.widgetDensityMultiplier &&
+        imageFit == other.imageFit &&
         fontWeight == other.fontWeight &&
         fontFamily == other.fontFamily &&
         fontSize == other.fontSize &&
@@ -262,6 +294,8 @@ class ParticleConfig {
       maxAlpha,
       Object.hash(
         sampleGap,
+        widgetDensityMultiplier,
+        imageFit,
         fontWeight,
         fontFamily,
         fontSize,
@@ -292,6 +326,8 @@ class ParticleConfig {
     double? minAlpha,
     double? maxAlpha,
     int? sampleGap,
+    double? widgetDensityMultiplier,
+    BoxFit? imageFit,
     FontWeight? fontWeight,
     String? fontFamily,
     double? fontSize,
@@ -318,6 +354,8 @@ class ParticleConfig {
       minAlpha: minAlpha ?? this.minAlpha,
       maxAlpha: maxAlpha ?? this.maxAlpha,
       sampleGap: sampleGap ?? this.sampleGap,
+      widgetDensityMultiplier: widgetDensityMultiplier ?? this.widgetDensityMultiplier,
+      imageFit: imageFit ?? this.imageFit,
       fontWeight: fontWeight ?? this.fontWeight,
       fontFamily: fontFamily ?? this.fontFamily,
       fontSize: fontSize ?? this.fontSize,
@@ -354,6 +392,8 @@ class ParticleConfig {
     double? minAlpha,
     double? maxAlpha,
     int? sampleGap,
+    double? widgetDensityMultiplier,
+    BoxFit? imageFit,
     FontWeight? fontWeight,
     String? fontFamily,
     double? fontSize,
@@ -380,6 +420,8 @@ class ParticleConfig {
       minAlpha: minAlpha ?? 0.5,
       maxAlpha: maxAlpha ?? 1.0,
       sampleGap: sampleGap ?? 2,
+      widgetDensityMultiplier: widgetDensityMultiplier ?? 1.0,
+      imageFit: imageFit ?? BoxFit.contain,
       fontWeight: fontWeight ?? FontWeight.bold,
       fontFamily: fontFamily,
       fontSize: fontSize,
@@ -414,6 +456,8 @@ class ParticleConfig {
     double? minAlpha,
     double? maxAlpha,
     int? sampleGap,
+    double? widgetDensityMultiplier,
+    BoxFit? imageFit,
     FontWeight? fontWeight,
     String? fontFamily,
     double? fontSize,
@@ -440,6 +484,8 @@ class ParticleConfig {
       minAlpha: minAlpha ?? 0.5,
       maxAlpha: maxAlpha ?? 1.0,
       sampleGap: sampleGap ?? 2,
+      widgetDensityMultiplier: widgetDensityMultiplier ?? 1.0,
+      imageFit: imageFit ?? BoxFit.contain,
       fontWeight: fontWeight ?? FontWeight.bold,
       fontFamily: fontFamily,
       fontSize: fontSize,
@@ -474,6 +520,8 @@ class ParticleConfig {
     double? minAlpha,
     double? maxAlpha,
     int? sampleGap,
+    double? widgetDensityMultiplier,
+    BoxFit? imageFit,
     FontWeight? fontWeight,
     String? fontFamily,
     double? fontSize,
@@ -500,6 +548,8 @@ class ParticleConfig {
       minAlpha: minAlpha ?? 0.5,
       maxAlpha: maxAlpha ?? 1.0,
       sampleGap: sampleGap ?? 2,
+      widgetDensityMultiplier: widgetDensityMultiplier ?? 1.0,
+      imageFit: imageFit ?? BoxFit.contain,
       fontWeight: fontWeight ?? FontWeight.bold,
       fontFamily: fontFamily,
       fontSize: fontSize,
@@ -534,6 +584,8 @@ class ParticleConfig {
     double? minAlpha,
     double? maxAlpha,
     int? sampleGap,
+    double? widgetDensityMultiplier,
+    BoxFit? imageFit,
     FontWeight? fontWeight,
     String? fontFamily,
     double? fontSize,
@@ -560,6 +612,8 @@ class ParticleConfig {
       minAlpha: minAlpha ?? 0.5,
       maxAlpha: maxAlpha ?? 1.0,
       sampleGap: sampleGap ?? 2,
+      widgetDensityMultiplier: widgetDensityMultiplier ?? 1.0,
+      imageFit: imageFit ?? BoxFit.contain,
       fontWeight: fontWeight ?? FontWeight.bold,
       fontFamily: fontFamily,
       fontSize: fontSize,
@@ -594,6 +648,8 @@ class ParticleConfig {
     double? minAlpha,
     double? maxAlpha,
     int? sampleGap,
+    double? widgetDensityMultiplier,
+    BoxFit? imageFit,
     FontWeight? fontWeight,
     String? fontFamily,
     double? fontSize,
@@ -620,6 +676,8 @@ class ParticleConfig {
       minAlpha: minAlpha ?? 0.5,
       maxAlpha: maxAlpha ?? 1.0,
       sampleGap: sampleGap ?? 3,
+      widgetDensityMultiplier: widgetDensityMultiplier ?? 1.0,
+      imageFit: imageFit ?? BoxFit.contain,
       fontWeight: fontWeight ?? FontWeight.bold,
       fontFamily: fontFamily,
       fontSize: fontSize,

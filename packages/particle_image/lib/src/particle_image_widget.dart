@@ -495,8 +495,27 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
       _initialized = false;
 
       if (_lastSize != Size.zero) {
-        _initSystem(_lastSize, dpr);
+        await _initSystem(_lastSize, dpr);
       }
+
+      // If the captured image was empty (child not yet painted), reset and
+      // retry on the next frame. This handles the case where toImage()
+      // returns a valid but fully transparent image on the first paint frame.
+      if (_system.particles.isEmpty) {
+        _childCaptured = false;
+        _initialized = false;
+        _disposeChildImage();
+        _loadedImage = null;
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_childCaptured && !_childCapturing) {
+            _captureChild(dpr);
+          }
+        });
+        return;
+      }
+
+      // Force rebuild so LayoutBuilder/CustomPaint picks up the new particles.
+      if (mounted) setState(() {});
     } catch (_) {
       if (mounted) widget.onError?.call();
     } finally {
@@ -696,16 +715,6 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
       return;
     }
 
-    // Capture child widget on first call (or after child change).
-    final needsChildCapture = widget.child != null && !_childCaptured;
-    if (needsChildCapture && !_childCapturing) {
-      // Schedule capture after this frame — child must be painted first.
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _captureChild(dpr);
-      });
-      return;
-    }
-
     final image = widget.image ?? _loadedImage;
     if (image == null) return; // asset/icon/network/child still loading
 
@@ -716,7 +725,7 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
       await _system.init();
     }
 
-    await _system.setImage(image, size);
+    await _system.setImage(image, size, skipBackgroundDetection: widget.child != null);
     widget.onImageLoaded?.call();
   }
 
@@ -769,6 +778,19 @@ class _ParticleImageState extends State<ParticleImage> with SingleTickerProvider
     // fills on top, hiding the child. RenderRepaintBoundary.toImage() captures
     // only the child's actual painted area.
     if (widget.child != null) {
+      // Schedule child capture on first build (double post-frame callback).
+      // Frame 1: child's RepaintBoundary is built, laid out, and painted.
+      // Frame 2: compositing is complete, so toImage() returns content.
+      if (!_childCaptured && !_childCapturing) {
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          SchedulerBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !_childCaptured && !_childCapturing) {
+              _captureChild(dpr);
+            }
+          });
+        });
+      }
+
       return _wrapSize(
         Stack(
           children: [

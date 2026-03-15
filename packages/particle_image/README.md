@@ -41,6 +41,7 @@ Move your cursor or touch to scatter the particles!
 - **Fixed size** — optional `width`/`height` parameters; no need to wrap in `SizedBox`
 - **Pause / resume control** — manual `paused` param + auto-pause on app background and inactive tabs
 - **Lifecycle callbacks** — `onReady`, `onImageLoaded`, `onError`, `onPause`, `onResume`
+- **Image fit control** — `BoxFit` modes (`contain`, `cover`, `fill`, `fitWidth`, `fitHeight`, `scaleDown`, `none`) via `ParticleConfig.imageFit`
 - **Dark pixel visibility** — dark image content (logos, text) stays visible as particles
 - **Powered by particle_core** — single GPU draw call, 10,000+ particles at 60fps
 - **Cross-platform** — iOS, Android, Web, macOS, Windows, Linux
@@ -129,6 +130,16 @@ ParticleImage.widget(
 
 The widget is rasterized internally via `RepaintBoundary` + `toImage()` — no manual conversion needed.
 It captures the widget at its natural size and renders the result as particles.
+
+Tune particle density for widget captures with `widgetDensityMultiplier`:
+
+```dart
+// Denser — better coverage for thin text or faint content
+ParticleImage.widget(myWidget, config: ParticleConfig(widgetDensityMultiplier: 2.0))
+
+// Sparser — better performance on mobile
+ParticleImage.widget(myWidget, config: ParticleConfig(widgetDensityMultiplier: 0.5))
+```
 
 ### Fixed size
 
@@ -309,6 +320,39 @@ ParticleImage.asset('logo.png', config: ParticleConfig(
 ))
 ```
 
+### Image fit
+
+Control how images scale within the particle canvas when aspect ratios don't match:
+
+```dart
+// Default — image fits entirely within canvas, no cropping
+ParticleImage.asset('logo.png', config: ParticleConfig(imageFit: BoxFit.contain))
+
+// Fill the entire canvas — crops edges if aspect ratios differ
+ParticleImage.asset('logo.png', config: ParticleConfig(imageFit: BoxFit.cover))
+
+// Match canvas width exactly — may crop top/bottom
+ParticleImage.asset('logo.png', config: ParticleConfig(imageFit: BoxFit.fitWidth))
+
+// No scaling — centered at original pixel size
+ParticleImage.asset('logo.png', config: ParticleConfig(imageFit: BoxFit.none))
+```
+
+All 7 standard `BoxFit` modes are supported:
+
+| BoxFit        | Behavior                                                    |
+|---------------|-------------------------------------------------------------|
+| `contain`     | Scales to fit entirely within the canvas (default)          |
+| `cover`       | Scales to fill the canvas, cropping edges as needed         |
+| `fill`        | Stretches to fill the canvas exactly (may distort)          |
+| `fitWidth`    | Scales to match the canvas width, may crop top/bottom       |
+| `fitHeight`   | Scales to match the canvas height, may crop left/right      |
+| `scaleDown`   | Like `contain` but never scales up beyond original size     |
+| `none`        | No scaling — centered at original pixel size                |
+
+Works with all image and icon constructors. Does not apply to `.widget()` (which preserves the
+widget's original logical size).
+
 ### Responsive resize
 
 `ParticleImage` automatically re-rasterizes and repositions particles when the widget size changes
@@ -360,6 +404,24 @@ All constructors accept an optional `config` parameter. Every field has a sensib
 | `particleColor`    | `Color` | `#8CAADE` | Particle color at rest (near target). **Ignored in image mode** — per-pixel colors are used instead |
 | `displacedColor`   | `Color` | `#DCE5FF` | Particle color when displaced far from target. **Ignored in image mode** |
 | `pointerGlowColor` | `Color` | `#C8D2F0` | Color of the pointer glow orb                                            |
+
+### Image scaling
+
+| Parameter  | Type     | Default          | Description                                                                                       |
+|------------|----------|------------------|---------------------------------------------------------------------------------------------------|
+| `imageFit` | `BoxFit` | `BoxFit.contain` | How the source image is inscribed into the particle canvas. All standard `BoxFit` modes supported. |
+
+### Widget capture density
+
+| Parameter                  | Type     | Default | Description                                                                   |
+|----------------------------|----------|---------|-------------------------------------------------------------------------------|
+| `widgetDensityMultiplier`  | `double` | `1.0`   | Scale factor for auto-computed particle density in `.widget()` mode           |
+
+- `1.0` — adaptive density (default)
+- `2.0` — double particles (denser, better for thin text or faint content)
+- `0.5` — half particles (sparser, better mobile performance)
+
+Only affects `ParticleImage.widget()` — no effect on images, icons, or text.
 
 ### Pointer glow & background
 

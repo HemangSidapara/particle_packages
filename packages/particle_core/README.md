@@ -14,7 +14,7 @@ widgets built on this engine.
 
 - **ParticleSystem** — physics engine with spring forces, pointer repulsion, and text/image
   rasterization
-- **ParticleConfig** — full configuration: colors, density, physics, fonts, presets
+- **ParticleConfig** — full configuration: colors, density, physics, fonts, image fit, presets
 - **ParticlePainter** — high-performance renderer using `Canvas.drawRawAtlas` (single GPU draw call)
 - **Particle** — data model for individual particles
 
@@ -79,6 +79,58 @@ Every field has a sensible default. Pass only what you want to override.
 | `drawBackground`   | `bool`   | `true`  | Draw solid background rect; set `false` for overlay use |
 | `showPointerGlow`  | `bool`   | `true`  | Show radial glow orb at pointer position                |
 | `pointerDotRadius` | `double` | `4.0`   | Radius of the bright dot at the pointer center          |
+
+### Image scaling *(used by ParticleImage; ignored in text mode)*
+
+| Parameter  | Type     | Default          | Description                                                                                       |
+|------------|----------|------------------|---------------------------------------------------------------------------------------------------|
+| `imageFit` | `BoxFit` | `BoxFit.contain` | How the source image is inscribed into the particle canvas. Supports all standard `BoxFit` modes. |
+
+`imageFit` controls how images and icons scale within the particle canvas when the aspect ratio
+doesn't match the widget bounds:
+
+| BoxFit        | Behavior                                                    |
+|---------------|-------------------------------------------------------------|
+| `contain`     | Scales to fit entirely within the canvas (default)          |
+| `cover`       | Scales to fill the canvas, cropping edges as needed         |
+| `fill`        | Stretches to fill the canvas exactly (may distort)          |
+| `fitWidth`    | Scales to match the canvas width, may crop top/bottom       |
+| `fitHeight`   | Scales to match the canvas height, may crop left/right      |
+| `scaleDown`   | Like `contain` but never scales up beyond original size     |
+| `none`        | No scaling — centered at original pixel size                |
+
+For cropping modes (`cover`, `fitWidth`, `fitHeight`), only the visible source region is sampled —
+pixels outside the crop are not turned into particles.
+
+Does **not** apply to widget captures (`ParticleImage.widget()`) which preserve their original
+logical size, or to text mode.
+
+```dart
+// Default — image fits within canvas, no cropping
+ParticleConfig(imageFit: BoxFit.contain)
+
+// Fill the entire canvas — crops edges if aspect ratios differ
+ParticleConfig(imageFit: BoxFit.cover)
+
+// Match width exactly — may crop top/bottom on tall images
+ParticleConfig(imageFit: BoxFit.fitWidth)
+```
+
+### Widget capture density *(used by ParticleImage.widget(); ignored elsewhere)*
+
+| Parameter                  | Type     | Default | Description                                                                                |
+|----------------------------|----------|---------|--------------------------------------------------------------------------------------------|
+| `widgetDensityMultiplier`  | `double` | `1.0`   | Scale factor for auto-computed particle density when rendering widget captures              |
+
+The particle system auto-computes density based on how much of the widget is filled vs transparent.
+This multiplier scales that result:
+
+- `1.0` (default) — adaptive density, no change
+- `2.0` — double the particles (denser, better coverage for faint or thin content)
+- `0.5` — half the particles (better performance, more sparse)
+
+Only affects `ParticleImage.widget()` — has no effect on text, asset images, network images,
+or icons.
 
 ### Text rendering *(used by ParticleText; ignored in image mode)*
 

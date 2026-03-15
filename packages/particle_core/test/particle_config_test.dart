@@ -25,6 +25,7 @@ void main() {
       expect(config.fontFamily, isNull);
       expect(config.showPointerGlow, true);
       expect(config.pointerDotRadius, 4.0);
+      expect(config.imageFit, BoxFit.contain);
     });
 
     test('fixed particleCount overrides density', () {
@@ -59,6 +60,36 @@ void main() {
       expect(config.particleColor, const Color(0xFFFF0000));
       expect(config.fontFamily, 'Roboto');
       expect(config.showPointerGlow, false);
+    });
+
+    test('copyWith preserves and overrides imageFit', () {
+      const config = ParticleConfig();
+      expect(config.imageFit, BoxFit.contain);
+
+      final updated = config.copyWith(imageFit: BoxFit.cover);
+      expect(updated.imageFit, BoxFit.cover);
+
+      // Other fields preserved
+      expect(updated.particleDensity, config.particleDensity);
+      expect(updated.friction, config.friction);
+
+      // copyWith without imageFit preserves original
+      final same = config.copyWith(friction: 0.95);
+      expect(same.imageFit, BoxFit.contain);
+    });
+
+    test('presets default imageFit to BoxFit.contain', () {
+      expect(ParticleConfig.cosmic().imageFit, BoxFit.contain);
+      expect(ParticleConfig.fire().imageFit, BoxFit.contain);
+      expect(ParticleConfig.matrix().imageFit, BoxFit.contain);
+      expect(ParticleConfig.pastel().imageFit, BoxFit.contain);
+      expect(ParticleConfig.minimal().imageFit, BoxFit.contain);
+    });
+
+    test('presets accept imageFit override', () {
+      final config = ParticleConfig.cosmic(imageFit: BoxFit.cover);
+      expect(config.imageFit, BoxFit.cover);
+      expect(config.particleDensity, 14000); // other values preserved
     });
   });
 
