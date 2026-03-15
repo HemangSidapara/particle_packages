@@ -69,4 +69,4 @@ melos publish
 
 ## License
 
-MIT License. See individual packages for details.
+MIT License. See [LICENSE](LICENSE) for details.
