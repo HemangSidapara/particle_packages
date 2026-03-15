@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2026-03-15
+
+### Changes
+
+---
+
+Packages with breaking changes:
+
+- There are no breaking changes in this release.
+
+Packages with other changes:
+
+- [`particle_core` - `v0.3.0`](#particle_core---v030)
+- [`particle_image` - `v0.3.0`](#particle_image---v030)
+- [`particle_text` - `v0.3.0`](#particle_text---v030)
+
+---
+
+#### `particle_core` - `v0.3.0`
+
+- `imageFit: BoxFit` config parameter for image scaling
+- `widgetDensityMultiplier` config parameter for widget capture density
+- `isSettled` getter for onReady detection
+
+#### `particle_image` - `v0.3.0`
+
+- `ParticleImage.network(url)` with placeholder system
+- `ParticleImage.icon()` / `.faIcon()` constructors
+- `ParticleImage.widget(child)` constructor
+- `width` / `height` params on all constructors
+- Pause/resume + lifecycle callbacks (`onReady`, `onError`, `onImageLoaded`, `onPause`, `onResume`)
+- `imageFit: BoxFit` support
+
+#### `particle_text` - `v0.3.0`
+
+- Pause/resume (`paused` param + auto-pause)
+- Lifecycle callbacks (`onReady`, `onPause`, `onResume`)
+
 ## 2026-03-10
 
 ### Changes

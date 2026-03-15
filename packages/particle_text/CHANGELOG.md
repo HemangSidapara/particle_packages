@@ -1,3 +1,10 @@
+## 0.3.0
+
+- **Pause / resume**: `paused` param + auto-pause on app background (`WidgetsBindingObserver`) and inactive tabs (`TickerMode`)
+- **`onReady` callback**: fires once when particles fully settle into shape
+- **`onPause` / `onResume` callbacks**: fire on any pause/resume transition (manual, background, tab)
+- Requires `particle_core: ^0.3.0`
+
 ## 0.2.1
 
 - **FEAT**(particle_core): implement responsive resizing, dark pixel visibility, and monorepo versioning (v0.2.0). ([8c666597](https://github.com/HemangSidapara/particle_packages/commit/8c666597c85e003f6e0f80616dad0810547fc2d4))

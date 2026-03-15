@@ -116,7 +116,7 @@ class ParticleConfig {
   final int sampleGap;
 
   /// Scale factor for particle density when rendering widget captures
-  /// via [ParticleImage.widget()].
+  /// via `ParticleImage.widget()`.
   ///
   /// The particle system auto-computes density based on how much of the
   /// widget is filled vs transparent. This multiplier scales that result:
@@ -124,8 +124,8 @@ class ParticleConfig {
   /// - `2.0` — double the particles (denser, better coverage for faint content)
   /// - `0.5` — half the particles (better performance, more sparse)
   ///
-  /// Only affects [ParticleImage.widget()] — has no effect on text, image,
-  /// icon, or network constructors.
+  /// Only affects the `ParticleImage.widget()` constructor — has no effect on
+  /// text, image, icon, or network constructors.
   final double widgetDensityMultiplier;
 
   /// How the source image is inscribed into the particle canvas.

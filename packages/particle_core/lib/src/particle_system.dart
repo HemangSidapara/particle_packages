@@ -290,7 +290,7 @@ class ParticleSystem extends ChangeNotifier {
   ///
   /// Samples up to 200 particles and checks that the average squared
   /// distance to target is below 4px² (≈ 2px average displacement).
-  /// Used by widgets to fire [onReady] once particles are visually formed.
+  /// Used by widgets to fire `onReady` once particles are visually formed.
   bool get isSettled {
     if (particles.isEmpty) return false;
     final n = particles.length;

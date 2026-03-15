@@ -1,3 +1,9 @@
+## 0.3.0
+
+- **`imageFit: BoxFit`**: new config parameter to control image scaling within the particle canvas (`contain`, `cover`, `fill`, `fitWidth`, `fitHeight`, `scaleDown`, `none`). Uses Flutter's `applyBoxFit`. Default `BoxFit.contain` (replaces hardcoded 0.85 margin).
+- **`widgetDensityMultiplier`**: new config parameter to scale particle density for widget captures (default `1.0`)
+- **`isSettled` getter**: check if particles have settled near targets (avg displacement < 2px). Used by widget `onReady` callbacks.
+
 ## 0.2.1
 
 - **FEAT**(particle_core): implement responsive resizing, dark pixel visibility, and monorepo versioning (v0.2.0). ([8c666597](https://github.com/HemangSidapara/particle_packages/commit/8c666597c85e003f6e0f80616dad0810547fc2d4))

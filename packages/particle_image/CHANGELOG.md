@@ -1,3 +1,14 @@
+## 0.3.0
+
+- **`ParticleImage.network(url)`**: load images from URLs with Flutter's built-in `ImageCache`. Animated comet-arc spinner placeholder by default; customizable via `placeholder` param.
+- **`ParticleImage.icon()` / `.faIcon()`**: render Material icons and Font Awesome v11+ icons as particles. Rasterized internally via `_renderGlyph()`.
+- **`ParticleImage.widget(child)`**: rasterize any Flutter widget as particles via `RepaintBoundary` + `toImage()`. Adaptive density with `widgetDensityMultiplier` config.
+- **`width` / `height` params**: all constructors accept optional fixed sizing (no `SizedBox` wrapper needed)
+- **Pause / resume**: `paused` param + auto-pause on app background and inactive tabs
+- **Lifecycle callbacks**: `onReady`, `onImageLoaded`, `onError`, `onPause`, `onResume`
+- **`imageFit: BoxFit`**: control image scaling within particle canvas (all 7 `BoxFit` modes). Applies to images and icons; widget captures preserve original size.
+- Requires `particle_core: ^0.3.0`
+
 ## 0.2.1
 
 - **FEAT**(particle_core): implement responsive resizing, dark pixel visibility, and monorepo versioning (v0.2.0). ([8c666597](https://github.com/HemangSidapara/particle_packages/commit/8c666597c85e003f6e0f80616dad0810547fc2d4))

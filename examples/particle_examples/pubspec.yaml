@@ -10,8 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  particle_text: ^0.2.1
-  particle_image: ^0.2.1
+  particle_text: ^0.3.0
+  particle_image: ^0.3.0
   font_awesome_flutter: ^11.0.0
 
 dev_dependencies:
