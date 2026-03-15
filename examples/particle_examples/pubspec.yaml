@@ -5,13 +5,13 @@ publish_to: 'none'
 resolution: workspace
 
 environment:
-  sdk: ^3.10.0
+  sdk: ^3.10.1
 
 dependencies:
   flutter:
     sdk: flutter
-  particle_text: ^0.3.0
-  particle_image: ^0.3.0
+  particle_text: ^0.3.1
+  particle_image: ^0.3.1
   font_awesome_flutter: ^11.0.0
 
 dev_dependencies:
