@@ -34,7 +34,7 @@ widgets built on this engine.
 
 ```yaml
 dependencies:
-  particle_core: ^0.3.0
+  particle_core: ^0.3.1
 ```
 
 ## ParticleConfig options
